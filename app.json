@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "ecomove",
+    "slug": "ecomove",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "",
+    "userInterfaceStyle": "light",
+
+    "splash": {
+      "image": "",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Precisamos de acesso à câmera para tirar fotos.",
+        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à galeria para selecionar fotos.",
+        "NSLocationAlwaysUsageDescription": "Usamos sua localização para registrar sua caminhada mesmo com o app fechado.",
+        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização durante a caminhada."
+      }
+    },
+
+    "android": {
+      "package": "ecomove.app.com",
+
+      "permissions": [
+        "INTERNET",
+        "READ_EXTERNAL_STORAGE",
+        "SYSTEM_ALERT_WINDOW",
+        "VIBRATE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ],
+
+      "foregroundService": {
+        "type": "location",
+        "notificationTitle": "EcoMove está registrando sua caminhada",
+        "notificationBody": "Acompanhe sua rota em tempo real."
+      },
+
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": { "scheme": "https" },
+          "category": ["BROWSABLE"]
+        },
+        {
+          "action": "VIEW",
+          "data": { "scheme": "ecomove.app.com" },
+          "category": ["DEFAULT", "BROWSABLE"]
+        }
+      ],
+
+      "adaptiveIcon": {
+        "foregroundImage": "",
+        "backgroundColor": "#ffffff"
+      }
+    },
+
+    "web": {
+      "favicon": ""
+    },
+
+    "extra": {
+      "eas": {
+        "projectId": "8b4226a3-c627-4a4c-98d2-25ad885c9846"
+      }
+    }
+  }
+}
