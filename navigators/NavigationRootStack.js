@@ -56,7 +56,7 @@ const NavigationRootStack = () => {
                                     </MenuLeftIcon>
                                 ),
                             })}
-                            initialRouteName="Login"
+                            initialRouteName={storedData ? "Tabs" : "Login"}
                         >
 
                         {storedData ? (

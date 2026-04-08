@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 
-import { Modal, TouchableOpacity, TouchableWithoutFeedback, View, FlatList } from "react-native";
+import { Modal, TouchableWithoutFeedback, View, FlatList, Pressable } from "react-native";
 
 import { Calendar, LocaleConfig } from "react-native-calendars";
 
@@ -174,14 +174,15 @@ export const DateTimePickerCustom = ({setDateSelected, useTodayAsMin, useTodayAs
                 </TouchableWithoutFeedback>
             </Modal>
 
-            <TouchableOpacity activeOpacity={1} onPress={toggleDatePicker}>
-                <StyledTextInput
-                    value={date}
-                    editable={false}
-                    pointerEvents="none"
-                    {...props}
-                />
-            </TouchableOpacity>
+            <Pressable onPress={toggleDatePicker}>
+                <View pointerEvents="none">
+                    <StyledTextInput
+                        value={date}
+                        editable={false}
+                        {...props}
+                    />
+                </View>
+            </Pressable>
         </View>
     );
 };

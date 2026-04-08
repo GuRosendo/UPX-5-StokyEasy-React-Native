@@ -33,7 +33,7 @@ export const BottomTabsLayout = () => {
                 component={InitialPage}
                 options={{
                     tabBarIcon: ({ color, size }) => (
-                        <FontAwesome6 name="house-chimney" color={color} size={size} />
+                        <FontAwesome6 name="box" color={color} size={size} />
                     ),
                 }}
             />
@@ -43,7 +43,7 @@ export const BottomTabsLayout = () => {
                 component={""}
                 options={{
                     tabBarIcon: ({ color, size }) => (
-                        <FontAwesome6 name="map" color={color} size={size} />
+                        <FontAwesome6 name="boxes-stacked" color={color} size={size} />
                     ),
                 }}
             />
@@ -53,7 +53,7 @@ export const BottomTabsLayout = () => {
                 component={""}
                 options={{
                     tabBarIcon: ({ color, size }) => (
-                        <FontAwesome6 name="clock-rotate-left" color={color} size={size} />
+                        <FontAwesome6 name="user-group" color={color} size={size} />
                     ),
                 }}
             />

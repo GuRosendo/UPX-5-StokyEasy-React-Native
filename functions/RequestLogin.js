@@ -54,16 +54,6 @@ export const handleRequestLogin = async(credentials) => {
         return false;
     }
 
-    if(!credentials.weight || credentials.weight > 500 || credentials.weight <= 0){
-        handleMessage(false, "Ocorreu um erro", "Peso incorreto");
-        return false;
-    }
-
-    if(!credentials.height || credentials.height > 3 || credentials.weight <= 0){
-        handleMessage(false, "Ocorreu um erro", "Altura incorreta");
-        return false;
-    }
-
     //requisição api
     if(!result.success){
         handleMessage(result.success, result.status, result.message);

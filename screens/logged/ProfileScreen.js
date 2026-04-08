@@ -5,13 +5,11 @@ import { Text, Button } from "react-native-paper";
 import { useTheme } from '../../components/ThemeContext';
 import { FontAwesome6 } from '@expo/vector-icons';
 
-import { formatWeight, formatHeight, formatCellphone } from '../../functions/general/Masks';
+import { formatCellphone } from '../../functions/general/Masks';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingField, setEditingField] = useState(null);
-  const [inputValue, setInputValue] = useState("");
 
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
@@ -37,65 +35,6 @@ export default function ProfileScreen() {
     }
 
     return date.toLocaleDateString("pt-BR");
-  };
-
-  const updateField = async (field, value) => {
-    try {
-      const updatedUser = { ...user, [field]: value };
-      setUser(updatedUser);
-
-      await AsyncStorage.setItem("userData", JSON.stringify(updatedUser));
-
-      const usersListJson = await AsyncStorage.getItem("users");
-      if (usersListJson) {
-        const usersList = JSON.parse(usersListJson);
-        const index = usersList.findIndex(u => u.id === updatedUser.id);
-
-        if (index !== -1) {
-          usersList[index] = updatedUser;
-          await AsyncStorage.setItem("users", JSON.stringify(usersList));
-        }
-      }
-
-    } catch (error) {
-      console.log("Erro ao atualizar campo:", error);
-    }
-  };
-
-  const openEditor = (field, currentValue) => {
-    setEditingField(field);
-
-    let formatted = "";
-    
-    if (field === "weight") {
-      formatted = formatWeight(currentValue, true);
-    } else if (field === "height") {
-      formatted = formatHeight(currentValue, true);
-    } else {
-      formatted = currentValue ? currentValue.toString() : "";
-    }
-
-    setInputValue(formatted);
-    setModalVisible(true);
-  };
-
-  const handleInputChange = (text) => {
-    let formatted = text;
-
-    if (editingField === "weight") {
-      formatted = formatWeight(text, true); 
-    } else if (editingField === "height") {
-      formatted = formatHeight(text, true); 
-    }
-
-    setInputValue(formatted);
-  };
-
-  const confirmEdit = () => {
-    if (!editingField) return;
-
-    updateField(editingField, inputValue);
-    setModalVisible(false);
   };
 
   if (!user)
@@ -160,18 +99,6 @@ export default function ProfileScreen() {
         <Text style={[styles.text, { color: colors.text }]}>
           <FontAwesome6 name="venus-mars" size={16} color={colors.mediumRed} /> Sexo: {user.gender}
         </Text>
-
-        <TouchableOpacity onPress={() => openEditor("weight", user.weight)}>
-          <Text style={[styles.text, { color: colors.text }]}>
-            <FontAwesome6 name="weight-scale" size={16} color={colors.mediumRed} /> Peso: {formatWeight(user.weight, true)} kg
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => openEditor("height", user.height)}>
-          <Text style={[styles.text, { color: colors.text }]}>
-            <FontAwesome6 name="ruler" size={16} color={colors.mediumRed} /> Altura: {user.height} cm
-          </Text>
-        </TouchableOpacity>
 
       </View>
     </View>
