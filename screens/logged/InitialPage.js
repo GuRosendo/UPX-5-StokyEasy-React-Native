@@ -71,9 +71,9 @@ export default function InitialPage({ navigation }) {
             />
 
             <View style={styles.titleContainer}>
-                <FontAwesome6 name="leaf" size={32} color={colors.mediumRed} style={styles.logo} />
+                <FontAwesome6 name="boxes-stacked" size={32} color={colors.mediumRed} style={styles.logo} />
                 <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
-                    Bem-vindo ao SotkyEasy!
+                    StokyEasy!
                 </Text>
             </View>
 
@@ -87,7 +87,7 @@ export default function InitialPage({ navigation }) {
                 onPress={() => navigation.navigate("Produtos")}
                 labelStyle={{ color: '#fff' }}
             >
-                Iniciar Caminhada
+                Produtos
             </Button>
 
             <Button
@@ -96,7 +96,7 @@ export default function InitialPage({ navigation }) {
                 onPress={() => navigation.navigate("Clientes")}
                 labelStyle={{ color: colors.mediumRed }}
             >
-                Ver Histórico
+                Clientes
             </Button>
 
             <Button

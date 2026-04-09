@@ -5,6 +5,8 @@ import { FontAwesome6 } from "@expo/vector-icons";
 import InitialPage from "../../screens/logged/InitialPage";
 
 import ProfileScreen from "../../screens/logged/ProfileScreen";
+import ProductsScreen from "../../screens/logged/ProductsScreen";
+import ClientsScreen from "../../screens/logged/ClientScreen";
 
 import { useTheme } from "../ThemeContext";
 
@@ -33,14 +35,14 @@ export const BottomTabsLayout = () => {
                 component={InitialPage}
                 options={{
                     tabBarIcon: ({ color, size }) => (
-                        <FontAwesome6 name="box" color={color} size={size} />
+                        <FontAwesome6 name="house-chimney" color={color} size={size} />
                     ),
                 }}
             />
 
             <Tab.Screen
                 name="Produtos"
-                component={""}
+                component={ProductsScreen}
                 options={{
                     tabBarIcon: ({ color, size }) => (
                         <FontAwesome6 name="boxes-stacked" color={color} size={size} />
@@ -50,7 +52,7 @@ export const BottomTabsLayout = () => {
 
             <Tab.Screen
                 name="Clientes"
-                component={""}
+                component={ClientsScreen}
                 options={{
                     tabBarIcon: ({ color, size }) => (
                         <FontAwesome6 name="user-group" color={color} size={size} />

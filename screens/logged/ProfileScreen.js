@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, StyleSheet, Image, TouchableOpacity, Modal, TextInput } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Text, Button } from "react-native-paper";
+import { Text } from "react-native-paper";
 import { useTheme } from '../../components/ThemeContext';
 import { FontAwesome6 } from '@expo/vector-icons';
 
@@ -9,7 +9,6 @@ import { formatCellphone } from '../../functions/general/Masks';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
 
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
@@ -42,35 +41,6 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Modal transparent visible={modalVisible} animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
-
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Editar {editingField === "weight" ? "Peso" : "Altura"}
-            </Text>
-
-            <TextInput
-              value={inputValue}
-              onChangeText={handleInputChange}
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text }]}
-              keyboardType="numeric"
-            />
-
-            <Button
-              mode="contained"
-              onPress={confirmEdit}
-              style={{ backgroundColor: colors.mediumRed, marginTop: 10 }}
-            >
-              Salvar
-            </Button>
-
-            <Button onPress={() => setModalVisible(false)} style={{ marginTop: 5  }}>
-              <Text style={{color: colors.text}}>Cancelar</Text>
-            </Button>
-          </View>
-        </View>
-      </Modal>
 
       {/* <Image
         source={require("../../assets/images/WalkingWoman.png")}
