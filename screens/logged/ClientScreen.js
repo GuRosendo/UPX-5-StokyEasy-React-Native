@@ -39,7 +39,9 @@ const toCurrencyDisplay = (num) =>
   `R$ ${(num || 0).toFixed(2).replace(".", ",")}`;
 
 const EMPTY_CLIENT = { name: "", email: "", phone: "" };
-const EMPTY_ORDER = { productId: "", quantity: "", installments: "" };
+
+// Um item de pedido: produto selecionado + quantidade + parcelas
+const EMPTY_ORDER_ITEM = { productId: "", quantity: "", installments: "" };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -57,9 +59,12 @@ export default function ClientsScreen() {
   const [editingClient, setEditingClient] = useState(null);
   const [clientForm, setClientForm] = useState(EMPTY_CLIENT);
 
+  // Modal de pedido — agora suporta múltiplos itens
   const [orderModal, setOrderModal] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState(null);
-  const [orderForm, setOrderForm] = useState(EMPTY_ORDER);
+  const [orderItems, setOrderItems] = useState([{ ...EMPTY_ORDER_ITEM }]);
+  // Qual item está com o picker de produto aberto
+  const [pickerOpenIndex, setPickerOpenIndex] = useState(null);
 
   const [addInstallmentModal, setAddInstallmentModal] = useState(false);
   const [addInstallmentValue, setAddInstallmentValue] = useState("");
@@ -85,7 +90,6 @@ export default function ClientsScreen() {
       .sort((a, b) => b.createdAt - a.createdAt);
     setClients(userClients);
 
-    // Carrega produtos do usuário para seleção no pedido
     const storedProducts = await AsyncStorage.getItem("products");
     const products = storedProducts ? JSON.parse(storedProducts) : [];
     setUserProducts(products.filter((p) => p.userId === user.id));
@@ -172,11 +176,12 @@ export default function ClientsScreen() {
     );
   };
 
-  // ── Pedidos ───────────────────────────────────────────────────────────────
+  // ── Pedidos (múltiplos itens) ─────────────────────────────────────────────
 
   const openCreateOrder = (clientId) => {
     setSelectedClientId(clientId);
-    setOrderForm({ productId: "", quantity: "", installments: "" });
+    setOrderItems([{ ...EMPTY_ORDER_ITEM }]);
+    setPickerOpenIndex(null);
     setExpandedOrderId(null);
     setOrderModal(true);
   };
@@ -184,79 +189,113 @@ export default function ClientsScreen() {
   const closeOrderModal = () => {
     setOrderModal(false);
     setSelectedClientId(null);
-    setOrderForm(EMPTY_ORDER);
+    setOrderItems([{ ...EMPTY_ORDER_ITEM }]);
+    setPickerOpenIndex(null);
+  };
+
+  const addOrderItem = () => {
+    setOrderItems((prev) => [...prev, { ...EMPTY_ORDER_ITEM }]);
+    setPickerOpenIndex(null);
+  };
+
+  const removeOrderItem = (index) => {
+    setOrderItems((prev) => prev.filter((_, i) => i !== index));
+    setPickerOpenIndex(null);
+  };
+
+  const updateOrderItem = (index, field, value) => {
+    setOrderItems((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
   const handleSaveOrder = async () => {
-    const qty = parseInt(orderForm.quantity, 10);
-    const installments = parseInt(orderForm.installments, 10);
+    // Valida todos os itens
+    for (let i = 0; i < orderItems.length; i++) {
+      const item = orderItems[i];
+      const qty = parseInt(item.quantity, 10);
+      const inst = parseInt(item.installments, 10);
 
-    if (!orderForm.productId) {
-      Alert.alert("Produto obrigatório", "Selecione um produto do estoque.");
-      return;
-    }
-    if (!qty || qty <= 0) {
-      Alert.alert("Campo inválido", "Informe uma quantidade válida.");
-      return;
-    }
-    if (!installments || installments <= 0) {
-      Alert.alert("Campo inválido", "Informe o número de parcelas.");
-      return;
+      if (!item.productId) {
+        Alert.alert("Produto obrigatório", `Selecione um produto no item ${i + 1}.`);
+        return;
+      }
+      if (!qty || qty <= 0) {
+        Alert.alert("Campo inválido", `Informe uma quantidade válida no item ${i + 1}.`);
+        return;
+      }
+      if (!inst || inst <= 0) {
+        Alert.alert("Campo inválido", `Informe o número de parcelas no item ${i + 1}.`);
+        return;
+      }
     }
 
-    // Verifica estoque
     const storedProducts = await AsyncStorage.getItem("products");
-    const products = storedProducts ? JSON.parse(storedProducts) : [];
-    const product = products.find((p) => p.productId === orderForm.productId);
+    let products = storedProducts ? JSON.parse(storedProducts) : [];
 
-    if (!product) {
-      Alert.alert("Erro", "Produto não encontrado.");
-      return;
+    // Verifica estoque de todos os itens antes de confirmar
+    for (let i = 0; i < orderItems.length; i++) {
+      const item = orderItems[i];
+      const qty = parseInt(item.quantity, 10);
+      const product = products.find((p) => p.productId === item.productId);
+
+      if (!product) {
+        Alert.alert("Erro", `Produto do item ${i + 1} não encontrado.`);
+        return;
+      }
+      if (product.quantity < qty) {
+        Alert.alert(
+          "Estoque insuficiente",
+          `Item ${i + 1}: disponível ${product.quantity} un. de "${product.name}".`
+        );
+        return;
+      }
     }
-    if (product.quantity < qty) {
-      Alert.alert(
-        "Estoque insuficiente",
-        `Disponível: ${product.quantity} unidade(s) de "${product.name}".`
+
+    // Gera um pedido por item e baixa o estoque
+    const now = Date.now();
+    const newOrders = orderItems.map((item, i) => {
+      const qty = parseInt(item.quantity, 10);
+      const inst = parseInt(item.installments, 10);
+      const product = products.find((p) => p.productId === item.productId);
+      const total = product.price * qty;
+      const installmentValue = total / inst;
+
+      // Baixa estoque
+      products = products.map((p) =>
+        p.productId === item.productId
+          ? { ...p, quantity: p.quantity - qty }
+          : p
       );
-      return;
-    }
 
-    const total = product.price * qty;
+      return {
+        orderId: `ord_${now}_${i}_${Math.random().toString(36).slice(2)}`,
+        clientId: selectedClientId,
+        totalValue: total,
+        quantity: qty,
+        installments: Array.from({ length: inst }, (_, j) => ({
+          installmentId: `inst_${now}_${i}_${j}`,
+          index: j + 1,
+          value: installmentValue,
+          paid: false,
+          paidAt: null,
+        })),
+        status: "active",
+        productRef: product.name,
+        productId: product.productId,
+        createdAt: now,
+      };
+    });
 
-    // Baixa estoque
-    const updatedProducts = products.map((p) =>
-      p.productId === product.productId
-        ? { ...p, quantity: p.quantity - qty }
-        : p
-    );
-    await AsyncStorage.setItem("products", JSON.stringify(updatedProducts));
-
-    const installmentValue = total / installments;
-    const installmentList = Array.from({ length: installments }, (_, i) => ({
-      installmentId: `inst_${Date.now()}_${i}`,
-      index: i + 1,
-      value: installmentValue,
-      paid: false,
-      paidAt: null,
-    }));
-
-    const newOrder = {
-      orderId: `ord_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      clientId: selectedClientId,
-      totalValue: total,
-      quantity: qty,
-      installments: installmentList,
-      status: "active",
-      productRef: product.name,
-      productId: product.productId,
-      createdAt: Date.now(),
-    };
+    await AsyncStorage.setItem("products", JSON.stringify(products));
 
     const stored = await AsyncStorage.getItem("clients");
     let list = stored ? JSON.parse(stored) : [];
     list = list.map((c) =>
       c.clientId === selectedClientId
-        ? { ...c, orders: [...(c.orders || []), newOrder] }
+        ? { ...c, orders: [...(c.orders || []), ...newOrders] }
         : c
     );
 
@@ -364,7 +403,6 @@ export default function ClientsScreen() {
               };
             });
 
-            // Devolve a quantidade correta ao estoque
             if (cancelledProductId) {
               const storedProducts = await AsyncStorage.getItem("products");
               let products = storedProducts ? JSON.parse(storedProducts) : [];
@@ -478,7 +516,6 @@ export default function ClientsScreen() {
 
                     {isClientExpanded && (
                       <Card.Content style={styles.expandedContent}>
-                        {/* Dados do cliente */}
                         {client.email ? (
                           <Text style={[styles.infoText, { color: colors.text }]}>
                             <FontAwesome6 name="envelope" size={13} color={colors.mediumRed} /> {client.email}
@@ -490,7 +527,6 @@ export default function ClientsScreen() {
                           </Text>
                         ) : null}
 
-                        {/* Ações do cliente */}
                         <View style={styles.actionRow}>
                           <Button
                             mode="contained"
@@ -521,7 +557,6 @@ export default function ClientsScreen() {
                           </Button>
                         </View>
 
-                        {/* Pedidos ativos */}
                         {activeOrders.length > 0 && (
                           <Text style={[styles.sectionLabel, { color: colors.text }]}>
                             Pedidos ativos
@@ -583,7 +618,6 @@ export default function ClientsScreen() {
                                     </View>
                                   ))}
 
-                                  {/* Ações do pedido */}
                                   <View style={[styles.actionRow, { marginTop: 10 }]}>
                                     <Button
                                       mode="outlined"
@@ -610,7 +644,6 @@ export default function ClientsScreen() {
                           );
                         })}
 
-                        {/* Pedidos cancelados */}
                         {cancelledOrders.length > 0 && (
                           <>
                             <Text style={[styles.sectionLabel, { color: colors.text, opacity: 0.5 }]}>
@@ -650,230 +683,294 @@ export default function ClientsScreen() {
       </TouchableOpacity>
 
       {/* ── Modal Cliente ─────────────────────────────────────────────────── */}
+      {/* FIX: overlay separado do KeyboardAvoidingView para evitar congelamento no Android */}
       <Modal visible={clientModal} transparent animationType="slide" onRequestClose={closeClientModal}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {editingClient ? "Editar Cliente" : "Novo Cliente"}
-              </Text>
-              <TouchableOpacity onPress={closeClientModal}>
-                <FontAwesome6 name="xmark" size={20} color={colors.text} />
-              </TouchableOpacity>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingModal}>
+            <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {editingClient ? "Editar Cliente" : "Novo Cliente"}
+                </Text>
+                <TouchableOpacity onPress={closeClientModal}>
+                  <FontAwesome6 name="xmark" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.label, { color: colors.text }]}>Nome *</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+                placeholder="Ex: João Silva"
+                placeholderTextColor={colors.text + "66"}
+                value={clientForm.name}
+                onChangeText={(v) => setClientForm({ ...clientForm, name: v })}
+              />
+
+              <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+                placeholder="cliente@email.com"
+                placeholderTextColor={colors.text + "66"}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={clientForm.email}
+                onChangeText={(v) => setClientForm({ ...clientForm, email: v })}
+              />
+
+              <Text style={[styles.label, { color: colors.text }]}>Telefone</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+                placeholder="(00) 00000-0000"
+                placeholderTextColor={colors.text + "66"}
+                keyboardType="phone-pad"
+                value={clientForm.phone}
+                onChangeText={(v) => setClientForm({ ...clientForm, phone: formatPhone(v) })}
+              />
+
+              <View style={styles.modalButtons}>
+                <Button mode="outlined" onPress={closeClientModal} style={[styles.modalBtn, { borderColor: colors.mediumRed }]} labelStyle={{ color: colors.mediumRed }}>
+                  Cancelar
+                </Button>
+                <Button mode="contained" onPress={handleSaveClient} style={[styles.modalBtn, { backgroundColor: colors.mediumRed }]} labelStyle={{ color: "#fff" }}>
+                  {editingClient ? "Salvar" : "Cadastrar"}
+                </Button>
+              </View>
             </View>
-
-            <Text style={[styles.label, { color: colors.text }]}>Nome *</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
-              placeholder="Ex: João Silva"
-              placeholderTextColor={colors.text + "66"}
-              value={clientForm.name}
-              onChangeText={(v) => setClientForm({ ...clientForm, name: v })}
-            />
-
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
-              placeholder="cliente@email.com"
-              placeholderTextColor={colors.text + "66"}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={clientForm.email}
-              onChangeText={(v) => setClientForm({ ...clientForm, email: v })}
-            />
-
-            <Text style={[styles.label, { color: colors.text }]}>Telefone</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
-              placeholder="(00) 00000-0000"
-              placeholderTextColor={colors.text + "66"}
-              keyboardType="phone-pad"
-              value={clientForm.phone}
-              onChangeText={(v) => setClientForm({ ...clientForm, phone: formatPhone(v) })}
-            />
-
-            <View style={styles.modalButtons}>
-              <Button mode="outlined" onPress={closeClientModal} style={[styles.modalBtn, { borderColor: colors.mediumRed }]} labelStyle={{ color: colors.mediumRed }}>
-                Cancelar
-              </Button>
-              <Button mode="contained" onPress={handleSaveClient} style={[styles.modalBtn, { backgroundColor: colors.mediumRed }]} labelStyle={{ color: "#fff" }}>
-                {editingClient ? "Salvar" : "Cadastrar"}
-              </Button>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
-      {/* ── Modal Pedido ──────────────────────────────────────────────────── */}
+      {/* ── Modal Pedido (múltiplos itens) ────────────────────────────────── */}
+      {/* FIX: mesmo padrão — overlay separado do KeyboardAvoidingView */}
       <Modal
         visible={orderModal}
         transparent
         animationType="slide"
         onRequestClose={closeOrderModal}
-        onShow={() => setOrderForm((f) => ({ ...f }))}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Novo Pedido</Text>
-              <TouchableOpacity onPress={closeOrderModal}>
-                <FontAwesome6 name="xmark" size={20} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Seleção de produto — FlatList evita ScrollView aninhado que trava no Android */}
-            <Text style={[styles.label, { color: colors.text }]}>Produto *</Text>
-            {userProducts.filter((p) => p.quantity > 0).length === 0 ? (
-              <View style={[styles.productPicker, { borderColor: colors.mediumRed, justifyContent: "center" }]}>
-                <Text style={[styles.noStockText, { color: colors.text }]}>
-                  ⚠️ Nenhum produto com estoque disponível.
-                </Text>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingModal}>
+            <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Novo Pedido</Text>
+                <TouchableOpacity onPress={closeOrderModal}>
+                  <FontAwesome6 name="xmark" size={20} color={colors.text} />
+                </TouchableOpacity>
               </View>
-            ) : (
-              <FlatList
-                data={userProducts.filter((p) => p.quantity > 0)}
-                keyExtractor={(p) => p.productId}
-                style={[styles.productPicker, { borderColor: colors.mediumRed }]}
-                scrollEnabled
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                renderItem={({ item: p }) => {
-                  const selected = orderForm.productId === p.productId;
+
+              {/* ScrollView interno para suportar múltiplos itens */}
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+                {orderItems.map((item, index) => {
+                  const availableProducts = userProducts.filter((p) => p.quantity > 0);
+                  const selectedProduct = userProducts.find((p) => p.productId === item.productId);
+                  const qty = parseInt(item.quantity, 10) || 0;
+                  const inst = parseInt(item.installments, 10) || 1;
+                  const total = selectedProduct ? selectedProduct.price * qty : 0;
+                  const overStock = selectedProduct && qty > selectedProduct.quantity;
+                  const isPickerOpen = pickerOpenIndex === index;
+
                   return (
-                    <TouchableOpacity
-                      style={[
-                        styles.productOption,
-                        { borderColor: selected ? colors.mediumRed : colors.text + "22" },
-                        selected && { backgroundColor: colors.mediumRed + "22" },
-                      ]}
-                      onPress={() => setOrderForm((f) => ({ ...f, productId: p.productId }))}
+                    <View
+                      key={index}
+                      style={[styles.orderItemBlock, { borderColor: colors.mediumRed + "40", backgroundColor: colors.background }]}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.productOptionName, { color: colors.text }]}>{p.name}</Text>
-                        <Text style={[styles.productOptionSub, { color: colors.text }]}>
-                          Estoque: {p.quantity} • {toCurrencyDisplay(p.price)} cada
+                      {/* Cabeçalho do item */}
+                      <View style={styles.orderItemHeader}>
+                        <Text style={[styles.orderItemTitle, { color: colors.mediumRed }]}>
+                          Item {index + 1}
                         </Text>
+                        {orderItems.length > 1 && (
+                          <TouchableOpacity onPress={() => removeOrderItem(index)}>
+                            <FontAwesome6 name="trash" size={15} color="#c0392b" />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      {selected && (
-                        <FontAwesome6 name="circle-check" size={18} color={colors.mediumRed} />
+
+                      {/* Seleção de produto */}
+                      <Text style={[styles.label, { color: colors.text }]}>Produto *</Text>
+                      <TouchableOpacity
+                        style={[styles.productSelector, { borderColor: colors.mediumRed, backgroundColor: colors.card }]}
+                        onPress={() => setPickerOpenIndex(isPickerOpen ? null : index)}
+                      >
+                        <Text style={{ color: selectedProduct ? colors.text : colors.text + "66", flex: 1 }}>
+                          {selectedProduct ? selectedProduct.name : "Selecione um produto..."}
+                        </Text>
+                        <FontAwesome6
+                          name={isPickerOpen ? "chevron-up" : "chevron-down"}
+                          size={12}
+                          color={colors.text}
+                        />
+                      </TouchableOpacity>
+
+                      {isPickerOpen && (
+                        availableProducts.length === 0 ? (
+                          <View style={[styles.productPicker, { borderColor: colors.mediumRed, justifyContent: "center" }]}>
+                            <Text style={[styles.noStockText, { color: colors.text }]}>
+                              ⚠️ Nenhum produto com estoque disponível.
+                            </Text>
+                          </View>
+                        ) : (
+                          <FlatList
+                            data={availableProducts}
+                            keyExtractor={(p) => p.productId}
+                            style={[styles.productPicker, { borderColor: colors.mediumRed }]}
+                            scrollEnabled
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item: p }) => {
+                              const selected = item.productId === p.productId;
+                              return (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.productOption,
+                                    { borderColor: selected ? colors.mediumRed : colors.text + "22" },
+                                    selected && { backgroundColor: colors.mediumRed + "22" },
+                                  ]}
+                                  onPress={() => {
+                                    updateOrderItem(index, "productId", p.productId);
+                                    setPickerOpenIndex(null);
+                                  }}
+                                >
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={[styles.productOptionName, { color: colors.text }]}>{p.name}</Text>
+                                    <Text style={[styles.productOptionSub, { color: colors.text }]}>
+                                      Estoque: {p.quantity} • {toCurrencyDisplay(p.price)} cada
+                                    </Text>
+                                  </View>
+                                  {selected && (
+                                    <FontAwesome6 name="circle-check" size={18} color={colors.mediumRed} />
+                                  )}
+                                </TouchableOpacity>
+                              );
+                            }}
+                          />
+                        )
                       )}
-                    </TouchableOpacity>
+
+                      {/* Quantidade e parcelas */}
+                      <View style={styles.row}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={[styles.label, { color: colors.text }]}>Quantidade *</Text>
+                          <TextInput
+                            style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.card }]}
+                            placeholder="1"
+                            placeholderTextColor={colors.text + "66"}
+                            keyboardType="numeric"
+                            value={item.quantity}
+                            onChangeText={(v) => updateOrderItem(index, "quantity", v.replace(/\D/g, ""))}
+                          />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 8 }}>
+                          <Text style={[styles.label, { color: colors.text }]}>Parcelas *</Text>
+                          <TextInput
+                            style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.card }]}
+                            placeholder="1"
+                            placeholderTextColor={colors.text + "66"}
+                            keyboardType="numeric"
+                            value={item.installments}
+                            onChangeText={(v) => updateOrderItem(index, "installments", v.replace(/\D/g, ""))}
+                          />
+                        </View>
+                      </View>
+
+                      {/* Preview */}
+                      {selectedProduct && item.quantity && item.installments ? (
+                        <View style={[styles.previewBox, { backgroundColor: overStock ? "#fdecea" : colors.card }]}>
+                          <FontAwesome6
+                            name={overStock ? "triangle-exclamation" : "circle-info"}
+                            size={14}
+                            color={overStock ? "#c0392b" : colors.mediumRed}
+                          />
+                          {overStock ? (
+                            <Text style={[styles.previewText, { color: "#c0392b" }]}>
+                              {" "}Estoque insuficiente! Disponível: {selectedProduct.quantity} un.
+                            </Text>
+                          ) : (
+                            <Text style={[styles.previewText, { color: colors.text }]}>
+                              {" "}Total: {toCurrencyDisplay(total)}  •  {inst}x de {toCurrencyDisplay(total / inst)}
+                            </Text>
+                          )}
+                        </View>
+                      ) : null}
+                    </View>
                   );
-                }}
-              />
-            )}
+                })}
 
-            {/* Quantidade e parcelas lado a lado */}
-            <View style={styles.row}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={[styles.label, { color: colors.text }]}>Quantidade *</Text>
-                <TextInput
-                  style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
-                  placeholder="1"
-                  placeholderTextColor={colors.text + "66"}
-                  keyboardType="numeric"
-                  value={orderForm.quantity}
-                  onChangeText={(v) => setOrderForm((f) => ({ ...f, quantity: v.replace(/\D/g, "") }))}
-                />
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={[styles.label, { color: colors.text }]}>Parcelas *</Text>
-                <TextInput
-                  style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
-                  placeholder="1"
-                  placeholderTextColor={colors.text + "66"}
-                  keyboardType="numeric"
-                  value={orderForm.installments}
-                  onChangeText={(v) => setOrderForm((f) => ({ ...f, installments: v.replace(/\D/g, "") }))}
-                />
-              </View>
-            </View>
+                {/* Botão adicionar item */}
+                <TouchableOpacity
+                  style={[styles.addItemBtn, { borderColor: colors.mediumRed }]}
+                  onPress={addOrderItem}
+                >
+                  <FontAwesome6 name="plus" size={13} color={colors.mediumRed} />
+                  <Text style={[styles.addItemBtnText, { color: colors.mediumRed }]}>
+                    Adicionar outro produto
+                  </Text>
+                </TouchableOpacity>
 
-            {/* Preview do total calculado */}
-            {orderForm.productId && orderForm.quantity && orderForm.installments ? (() => {
-              const prod = userProducts.find((p) => p.productId === orderForm.productId);
-              const qty = parseInt(orderForm.quantity, 10) || 0;
-              const inst = parseInt(orderForm.installments, 10) || 1;
-              const total = prod ? prod.price * qty : 0;
-              const overStock = prod && qty > prod.quantity;
-              return (
-                <View style={[styles.previewBox, { backgroundColor: overStock ? "#fdecea" : colors.background }]}>
-                  <FontAwesome6
-                    name={overStock ? "triangle-exclamation" : "circle-info"}
-                    size={14}
-                    color={overStock ? "#c0392b" : colors.mediumRed}
-                  />
-                  {overStock ? (
-                    <Text style={[styles.previewText, { color: "#c0392b" }]}>
-                      {" "}Estoque insuficiente! Disponível: {prod.quantity} un.
-                    </Text>
-                  ) : (
-                    <Text style={[styles.previewText, { color: colors.text }]}>
-                      {" "}Total: {toCurrencyDisplay(total)}  •  {inst}x de {toCurrencyDisplay(total / inst)}
-                    </Text>
-                  )}
+                <View style={styles.modalButtons}>
+                  <Button mode="outlined" onPress={closeOrderModal} style={[styles.modalBtn, { borderColor: colors.mediumRed }]} labelStyle={{ color: colors.mediumRed }}>
+                    Cancelar
+                  </Button>
+                  <Button mode="contained" onPress={handleSaveOrder} style={[styles.modalBtn, { backgroundColor: colors.mediumRed }]} labelStyle={{ color: "#fff" }}>
+                    Criar pedido{orderItems.length > 1 ? `s (${orderItems.length})` : ""}
+                  </Button>
                 </View>
-              );
-            })() : null}
-
-            <View style={styles.modalButtons}>
-              <Button mode="outlined" onPress={closeOrderModal} style={[styles.modalBtn, { borderColor: colors.mediumRed }]} labelStyle={{ color: colors.mediumRed }}>
-                Cancelar
-              </Button>
-              <Button mode="contained" onPress={handleSaveOrder} style={[styles.modalBtn, { backgroundColor: colors.mediumRed }]} labelStyle={{ color: "#fff" }}>
-                Criar pedido
-              </Button>
+              </ScrollView>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* ── Modal Adicionar Parcela ───────────────────────────────────────── */}
+      {/* FIX: mesmo padrão de separação overlay/KeyboardAvoidingView */}
       <Modal
         visible={addInstallmentModal}
         transparent
         animationType="slide"
         onRequestClose={() => setAddInstallmentModal(false)}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
-          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Adicionar Parcela</Text>
-              <TouchableOpacity onPress={() => setAddInstallmentModal(false)}>
-                <FontAwesome6 name="xmark" size={20} color={colors.text} />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingModal}>
+            <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Adicionar Parcela</Text>
+                <TouchableOpacity onPress={() => setAddInstallmentModal(false)}>
+                  <FontAwesome6 name="xmark" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
 
-            <Text style={[styles.label, { color: colors.text }]}>Valor da parcela *</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
-              placeholder="0,00"
-              placeholderTextColor={colors.text + "66"}
-              keyboardType="numeric"
-              value={addInstallmentValue}
-              onChangeText={(v) => setAddInstallmentValue(formatCurrency(v))}
-            />
+              <Text style={[styles.label, { color: colors.text }]}>Valor da parcela *</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+                placeholder="0,00"
+                placeholderTextColor={colors.text + "66"}
+                keyboardType="numeric"
+                value={addInstallmentValue}
+                onChangeText={(v) => setAddInstallmentValue(formatCurrency(v))}
+              />
 
-            <View style={styles.modalButtons}>
-              <Button mode="outlined" onPress={() => setAddInstallmentModal(false)} style={[styles.modalBtn, { borderColor: colors.mediumRed }]} labelStyle={{ color: colors.mediumRed }}>
-                Cancelar
-              </Button>
-              <Button
-                mode="contained"
-                onPress={() => {
-                  const client = clients.find((c) =>
-                    c.orders?.some((o) => o.orderId === selectedOrderId)
-                  );
-                  if (client) handleAddInstallment(client.clientId);
-                }}
-                style={[styles.modalBtn, { backgroundColor: colors.mediumRed }]}
-                labelStyle={{ color: "#fff" }}
-              >
-                Adicionar
-              </Button>
+              <View style={styles.modalButtons}>
+                <Button mode="outlined" onPress={() => setAddInstallmentModal(false)} style={[styles.modalBtn, { borderColor: colors.mediumRed }]} labelStyle={{ color: colors.mediumRed }}>
+                  Cancelar
+                </Button>
+                <Button
+                  mode="contained"
+                  onPress={() => {
+                    const client = clients.find((c) =>
+                      c.orders?.some((o) => o.orderId === selectedOrderId)
+                    );
+                    if (client) handleAddInstallment(client.clientId);
+                  }}
+                  style={[styles.modalBtn, { backgroundColor: colors.mediumRed }]}
+                  labelStyle={{ color: "#fff" }}
+                >
+                  Adicionar
+                </Button>
+              </View>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -919,23 +1016,37 @@ const styles = StyleSheet.create({
 
   fab: { position: "absolute", bottom: 28, right: 24, width: 58, height: 58, borderRadius: 29, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 4 },
 
+  // FIX: overlay e KeyboardAvoidingView separados
   modalOverlay: { flex: 1, backgroundColor: "#00000090", justifyContent: "flex-end" },
-  modalBox: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, elevation: 10 },
+  keyboardAvoidingModal: { width: "100%" },
+  modalBox: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, elevation: 10, maxHeight: "92%" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: "700" },
   label: { fontSize: 13, fontWeight: "600", marginBottom: 4, marginTop: 10, opacity: 0.8 },
   input: { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  modalButtons: { flexDirection: "row", gap: 12, marginTop: 20 },
+  modalButtons: { flexDirection: "row", gap: 12, marginTop: 20, marginBottom: 8 },
   modalBtn: { flex: 1, borderRadius: 12 },
 
   previewBox: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 10, marginTop: 10 },
-  previewText: { fontSize: 14, fontWeight: "600" },
+  previewText: { fontSize: 13, fontWeight: "600", flexShrink: 1 },
   hintText: { fontSize: 12, opacity: 0.55, marginTop: 10, lineHeight: 17 },
 
-  productPicker: { maxHeight: 160, borderWidth: 1.5, borderRadius: 10, marginTop: 2, padding: 4 },
+  // Seletor de produto compacto (dropdown)
+  productSelector: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  productPicker: { maxHeight: 150, borderWidth: 1.5, borderRadius: 10, marginTop: 4, padding: 4 },
   productOption: { flexDirection: "row", alignItems: "center", padding: 10, borderRadius: 8, borderWidth: 1.5, marginBottom: 6 },
   productOptionName: { fontSize: 14, fontWeight: "600" },
   productOptionSub: { fontSize: 12, opacity: 0.6, marginTop: 1 },
   noStockText: { padding: 10, opacity: 0.6, fontSize: 13, textAlign: "center" },
+
+  // Bloco de cada item no modal de pedido
+  orderItemBlock: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12 },
+  orderItemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  orderItemTitle: { fontSize: 13, fontWeight: "700" },
+
+  // Botão adicionar item
+  addItemBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1.5, borderRadius: 10, paddingVertical: 10, marginBottom: 4 },
+  addItemBtnText: { fontSize: 14, fontWeight: "600" },
+
   row: { flexDirection: "row" },
 });

@@ -1,4 +1,4 @@
-package com.ecomove
+package com.stokyeasy.app
 
 import android.app.Application
 import android.content.res.Configuration

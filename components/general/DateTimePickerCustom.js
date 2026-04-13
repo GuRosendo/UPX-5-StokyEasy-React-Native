@@ -175,13 +175,11 @@ export const DateTimePickerCustom = ({setDateSelected, useTodayAsMin, useTodayAs
             </Modal>
 
             <Pressable onPress={toggleDatePicker}>
-                <View pointerEvents="none">
-                    <StyledTextInput
-                        value={date}
-                        editable={false}
-                        {...props}
-                    />
-                </View>
+                <StyledTextInput
+                    value={date}
+                    editable={false}
+                    {...props}
+                />
             </Pressable>
         </View>
     );

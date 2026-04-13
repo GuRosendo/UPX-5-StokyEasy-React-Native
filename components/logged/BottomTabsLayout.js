@@ -5,8 +5,9 @@ import { FontAwesome6 } from "@expo/vector-icons";
 import InitialPage from "../../screens/logged/InitialPage";
 
 import ProfileScreen from "../../screens/logged/ProfileScreen";
-import ProductsScreen from "../../screens/logged/ProductsScreen";
-import ClientsScreen from "../../screens/logged/ClientScreen";
+
+import ClientsScreen from "../../screens/logged/clients/ClientsScreen";
+import ProductsScreen from "../../screens/logged/products/ProductsScreen";
 
 import { useTheme } from "../ThemeContext";
 
