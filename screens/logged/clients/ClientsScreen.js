@@ -1,4 +1,4 @@
-import { View, ScrollView, TouchableOpacity } from "react-native";
+import { View, FlatList, TouchableOpacity } from "react-native";
 import { Text } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { useTheme } from "../../../components/ThemeContext";
@@ -54,64 +54,70 @@ export default function ClientsScreen() {
     toggleOrder,
   } = useClients();
 
+  const ListHeader = (
+    <>
+      <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
+        Clientes
+      </Text>
+
+      {/* Resumo */}
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="users" size={18} color={colors.mediumRed} />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{totalClients}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>Clientes</Text>
+        </View>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="cart-shopping" size={18} color={colors.mediumRed} />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{totalActiveOrders}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>Pedidos ativos</Text>
+        </View>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="clock" size={18} color={colors.mediumRed} />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>
+            {toCurrencyDisplay(totalPending)}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>A receber</Text>
+        </View>
+      </View>
+    </>
+  );
+
+  const ListEmpty = (
+    <View style={styles.emptyContainer}>
+      <FontAwesome6 name="user-slash" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
+      <Text style={[styles.empty, { color: colors.text }]}>
+        Nenhum cliente cadastrado ainda.
+      </Text>
+    </View>
+  );
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
-          Clientes
-        </Text>
-
-        {/* Resumo */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-            <FontAwesome6 name="users" size={18} color={colors.mediumRed} />
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalClients}</Text>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>Clientes</Text>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-            <FontAwesome6 name="cart-shopping" size={18} color={colors.mediumRed} />
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalActiveOrders}</Text>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>Pedidos ativos</Text>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-            <FontAwesome6 name="clock" size={18} color={colors.mediumRed} />
-            <Text style={[styles.summaryValue, { color: colors.text }]}>
-              {toCurrencyDisplay(totalPending)}
-            </Text>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>A receber</Text>
-          </View>
-        </View>
-
-        {/* Lista de clientes */}
-        {clients.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <FontAwesome6 name="user-slash" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
-            <Text style={[styles.empty, { color: colors.text }]}>
-              Nenhum cliente cadastrado ainda.
-            </Text>
-          </View>
-        ) : (
-          clients.map((client) => (
-            <ClientCard
-              key={client.clientId}
-              client={client}
-              isExpanded={expandedClientId === client.clientId}
-              expandedOrderId={expandedOrderId}
-              onToggleClient={toggleClient}
-              onToggleOrder={toggleOrder}
-              onNewOrder={openCreateOrder}
-              onEditClient={openEditClient}
-              onDeleteClient={handleDeleteClient}
-              onPayInstallment={handlePayInstallment}
-              onAddInstallment={openAddInstallment}
-              onCancelOrder={handleCancelOrder}
-              colors={colors}
-            />
-          ))
+      <FlatList
+        data={clients}
+        keyExtractor={(item) => item.clientId}
+        contentContainerStyle={styles.container}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={ListEmpty}
+        ListFooterComponent={<View style={{ height: 100 }} />}
+        renderItem={({ item: client }) => (
+          <ClientCard
+            client={client}
+            isExpanded={expandedClientId === client.clientId}
+            expandedOrderId={expandedOrderId}
+            onToggleClient={toggleClient}
+            onToggleOrder={toggleOrder}
+            onNewOrder={openCreateOrder}
+            onEditClient={openEditClient}
+            onDeleteClient={handleDeleteClient}
+            onPayInstallment={handlePayInstallment}
+            onAddInstallment={openAddInstallment}
+            onCancelOrder={handleCancelOrder}
+            colors={colors}
+          />
         )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      />
 
       {/* FAB */}
       <TouchableOpacity

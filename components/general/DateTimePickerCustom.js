@@ -1,177 +1,185 @@
 import React, { useState, useEffect, useRef } from "react";
-
-import { Modal, TouchableWithoutFeedback, View, FlatList, Pressable } from "react-native";
-
+import { View, FlatList, Pressable } from "react-native";
+import Modal from "react-native-modal";
 import { Calendar, LocaleConfig } from "react-native-calendars";
 
 import { useTheme } from "../ThemeContext";
+import {
+    ModalContainer,
+    StyledTextInput,
+    TextDateModal,
+    YearItem,
+    YearSelector,
+    YearText
+} from "../../components/general/styles";
 
-import { ModalBackground, ModalContainer, StyledTextInput, TextDateModal, YearItem, YearSelector, YearText } from "../../components/general/styles";
+import {
+    monthNames,
+    monthNamesShort,
+    dayNames,
+    dayNamesShort,
+    today
+} from "../dateNames/dateNamesPtBr";
 
-import { monthNames, monthNamesShort, dayNames, dayNamesShort, today } from "../dateNames/dateNamesPtBr";
-
-//Configuração de idioma PT-BR (Data)
+// Locale
 LocaleConfig.locales["pt-br"] = {
-    monthNames: monthNames,
-    monthNamesShort: monthNamesShort,
-    dayNames: dayNames,
-    dayNamesShort: dayNamesShort,
-    today: today,
+    monthNames,
+    monthNamesShort,
+    dayNames,
+    dayNamesShort,
+    today,
 };
-
 LocaleConfig.defaultLocale = "pt-br";
 
 const ITEM_HEIGHT = 48;
 
-export const DateTimePickerCustom = ({setDateSelected, useTodayAsMin, useTodayAsMax, useTodayAsDefaultValue, ...props}) => {
+export const DateTimePickerCustom = ({
+    setDateSelected,
+    useTodayAsMin,
+    useTodayAsMax,
+    useTodayAsDefaultValue,
+    ...props
+}) => {
     const { theme, themeColors } = useTheme();
     const colors = themeColors[theme];
 
-    const today = new Date();
-    const todayString = today.toISOString().split("T")[0];
+    const todayDate = new Date();
+    const todayString = todayDate.toISOString().split("T")[0];
 
-    const currentYear = today.getFullYear();
+    const currentYear = todayDate.getFullYear();
+    const minYear = currentYear - 150;
+    const maxYear = currentYear + 150;
 
-    const minYear = currentYear - 150; //-150 anos da data atual
-    const maxYear = currentYear + 150; //+150 anos da data atual
+    const [date, setDate] = useState(
+        useTodayAsDefaultValue ? todayString : "2000-01-01"
+    );
 
-    const [date, setDate] = useState(useTodayAsDefaultValue ? todayString : "2000-01-01");
     const [show, setShow] = useState(false);
+    const [yearSelector, setYearSelector] = useState(false);
 
-    const [calendarMonth, setCalendarMonth] = useState(useTodayAsDefaultValue ? today.getMonth() + 1 : 1);
+    const [calendarMonth, setCalendarMonth] = useState(
+        useTodayAsDefaultValue ? todayDate.getMonth() + 1 : 1
+    );
 
-    const [yearModalVisible, setYearModalVisible] = useState(false);
-    const [calendarYear, setCalendarYear] = useState(useTodayAsDefaultValue ? today.getFullYear() : 2000);
+    const [calendarYear, setCalendarYear] = useState(
+        useTodayAsDefaultValue ? todayDate.getFullYear() : 2000
+    );
 
-    const toggleDatePicker = () => {
-        setShow(!show);
-    }
+    const flatListRef = useRef(null);
+
+    const toggleDatePicker = () => setShow(prev => !prev);
 
     const onDayPress = (day) => {
         const [year, month, dayNum] = day.dateString.split("-").map(Number);
-
         const localDate = new Date(year, month - 1, dayNum);
 
         setDate(day.dateString);
         setDateSelected(localDate);
-        toggleDatePicker();
+        setShow(false);
     };
-
-    const toggleYearSelector = () => {
-        setYearModalVisible(!yearModalVisible);
-    }
 
     const handleYearSelect = (year) => {
         setCalendarYear(year);
-        toggleYearSelector();
+        setYearSelector(false);
     };
 
-    const renderYearItem = ({ item }) => (
-        <YearItem height={ITEM_HEIGHT} onPress={() => handleYearSelect(item)}>
-            <YearText color={colors.text}>{item}</YearText>
-        </YearItem>
-    );
+    const generateYearList = () =>
+        Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+
+    useEffect(() => {
+        if (yearSelector && flatListRef.current) {
+            flatListRef.current.scrollToIndex({
+                index: calendarYear - minYear,
+                animated: true,
+                viewPosition: 0.5,
+            });
+        }
+    }, [yearSelector]);
 
     const getCurrentMonthDate = (year, month) => {
         const paddedMonth = month.toString().padStart(2, "0");
         return `${year}-${paddedMonth}-01`;
     };
 
-    const generateYearList = () => Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
-
-    const flatListRef = useRef(null);
-
-    useEffect(() => {
-        if(yearModalVisible && flatListRef.current){
-            flatListRef.current.scrollToIndex({
-                index: calendarYear - minYear,
-                animated: true,
-                viewPosition: 0.5, 
-            });
-        }
-    }, [calendarYear, yearModalVisible]);
-
     return (
         <View>
-            <Modal visible={show} transparent animationType="fade">
-                <TouchableWithoutFeedback onPress={toggleDatePicker}>
-                    <ModalBackground>
-                        <TouchableWithoutFeedback>
-                            <ModalContainer background={colors.background}>
-                                <YearSelector onPress={toggleYearSelector}>
-                                    <TextDateModal color={colors.text}>
-                                        {calendarYear}
-                                    </TextDateModal>
-                                </YearSelector>
+            <Modal
+                isVisible={show}
+                onBackdropPress={toggleDatePicker}
+                backdropOpacity={0.5}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                useNativeDriver
+            >
+                <ModalContainer background={colors.background}>
+                    
+                    <YearSelector onPress={() => setYearSelector(true)}>
+                        <TextDateModal color={colors.text}>
+                            {calendarYear}
+                        </TextDateModal>
+                    </YearSelector>
 
-                                <Calendar
-                                    key={`calendar-${calendarYear}`}
-                                    onDayPress={onDayPress}
-                                    current={getCurrentMonthDate(calendarYear, calendarMonth)}
-
-                                    onMonthChange={(month) => {
-                                        setCalendarYear(month.year);
-                                        setCalendarMonth(month.month);
-                                    }}
-
-                                    markedDates={{
-                                        [date]: {
-                                            selected: true,
-                                            selectedColor: theme == "light" ? colors.mediumRed : colors.darkRed,
-                                            selectedTextColor: colors.white,
-                                        },
-                                    }}
-
-                                    minDate={useTodayAsMin ? todayString : undefined}
-                                    maxDate={useTodayAsMax ? todayString : undefined}
-
-                                    theme={{
-                                        backgroundColor: colors.background,
-                                        calendarBackground: colors.background,
-                                        textSectionTitleColor: colors.text,
-                                        dayTextColor: colors.text,
-                                        todayTextColor: theme == "light" ? colors.mediumRed : colors.darkRed,
-                                        selectedDayTextColor: colors.white,
-                                        monthTextColor: colors.text,
-                                        arrowColor: theme == "light" ? colors.mediumRed : colors.darkRed,
-                                        textDisabledColor: colors.grey,
-                                    }}
-                                />
-                            </ModalContainer>
-                        </TouchableWithoutFeedback>
-                    </ModalBackground>
-                </TouchableWithoutFeedback>
-            </Modal>
-
-            <Modal visible={yearModalVisible} transparent animationType="fade">
-                <TouchableWithoutFeedback onPress={toggleYearSelector}>
-                    <ModalBackground>
-                        <TouchableWithoutFeedback>
-                            <ModalContainer background={colors.background} yearModal={true}>
-                                <FlatList
-                                    ref={flatListRef}
-                                    data={generateYearList()}
-                                    keyExtractor={(item) => item.toString()}
-                                    renderItem={renderYearItem}
-
-                                    onLayout={() => {
-                                        flatListRef.current?.scrollToIndex({
-                                            index: calendarYear - minYear,
-                                            animated: true,
-                                            viewPosition: 0.5,
-                                        });
-                                    }}
-
-                                    getItemLayout={(data, index) => ({
-                                        length: ITEM_HEIGHT,
-                                        offset: ITEM_HEIGHT * index,
-                                        index,
-                                    })}
-                                />
-                            </ModalContainer>
-                        </TouchableWithoutFeedback>
-                    </ModalBackground>
-                </TouchableWithoutFeedback>
+                    {!yearSelector ? (
+                        <Calendar
+                            key={`calendar-${calendarYear}`}
+                            onDayPress={onDayPress}
+                            current={getCurrentMonthDate(calendarYear, calendarMonth)}
+                            onMonthChange={(month) => {
+                                setCalendarYear(month.year);
+                                setCalendarMonth(month.month);
+                            }}
+                            markedDates={{
+                                [date]: {
+                                    selected: true,
+                                    selectedColor:
+                                        theme === "light"
+                                            ? colors.mediumRed
+                                            : colors.darkRed,
+                                    selectedTextColor: colors.white,
+                                },
+                            }}
+                            minDate={useTodayAsMin ? todayString : undefined}
+                            maxDate={useTodayAsMax ? todayString : undefined}
+                            theme={{
+                                backgroundColor: colors.background,
+                                calendarBackground: colors.background,
+                                textSectionTitleColor: colors.text,
+                                dayTextColor: colors.text,
+                                todayTextColor:
+                                    theme === "light"
+                                        ? colors.mediumRed
+                                        : colors.darkRed,
+                                monthTextColor: colors.text,
+                                arrowColor:
+                                    theme === "light"
+                                        ? colors.mediumRed
+                                        : colors.darkRed,
+                                textDisabledColor: colors.grey,
+                            }}
+                        />
+                    ) : (
+                        <FlatList
+                            ref={flatListRef}
+                            data={generateYearList()}
+                            keyExtractor={(item) => item.toString()}
+                            renderItem={({ item }) => (
+                                <YearItem
+                                    height={ITEM_HEIGHT}
+                                    onPress={() => handleYearSelect(item)}
+                                >
+                                    <YearText color={colors.text}>
+                                        {item}
+                                    </YearText>
+                                </YearItem>
+                            )}
+                            getItemLayout={(data, index) => ({
+                                length: ITEM_HEIGHT,
+                                offset: ITEM_HEIGHT * index,
+                                index,
+                            })}
+                        />
+                    )}
+                </ModalContainer>
             </Modal>
 
             <Pressable onPress={toggleDatePicker}>

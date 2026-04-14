@@ -1,4 +1,4 @@
-import { View, ScrollView, TouchableOpacity } from "react-native";
+import { View, FlatList, TouchableOpacity } from "react-native";
 import { Text } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { useTheme } from "../../../components/ThemeContext";
@@ -28,58 +28,64 @@ export default function ProductsScreen() {
     toggleExpand,
   } = useProducts();
 
+  const ListHeader = (
+    <>
+      <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
+        Produtos
+      </Text>
+
+      {/* Resumo */}
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="boxes-stacked" size={20} color={colors.mediumRed} />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{products.length}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>Produtos</Text>
+        </View>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="cubes" size={20} color={colors.mediumRed} />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{totalStock}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>Em estoque</Text>
+        </View>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="sack-dollar" size={20} color={colors.mediumRed} />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>
+            R$ {totalValue.toFixed(2).replace(".", ",")}
+          </Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>Valor total</Text>
+        </View>
+      </View>
+    </>
+  );
+
+  const ListEmpty = (
+    <View style={styles.emptyContainer}>
+      <FontAwesome6 name="box-open" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
+      <Text style={[styles.empty, { color: colors.text }]}>
+        Nenhum produto cadastrado ainda.
+      </Text>
+    </View>
+  );
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
-          Produtos
-        </Text>
-
-        {/* Resumo */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-            <FontAwesome6 name="boxes-stacked" size={20} color={colors.mediumRed} />
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{products.length}</Text>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>Produtos</Text>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-            <FontAwesome6 name="cubes" size={20} color={colors.mediumRed} />
-            <Text style={[styles.summaryValue, { color: colors.text }]}>{totalStock}</Text>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>Em estoque</Text>
-          </View>
-          <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
-            <FontAwesome6 name="sack-dollar" size={20} color={colors.mediumRed} />
-            <Text style={[styles.summaryValue, { color: colors.text }]}>
-              R$ {totalValue.toFixed(2).replace(".", ",")}
-            </Text>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>Valor total</Text>
-          </View>
-        </View>
-
-        {/* Lista */}
-        {products.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <FontAwesome6 name="box-open" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
-            <Text style={[styles.empty, { color: colors.text }]}>
-              Nenhum produto cadastrado ainda.
-            </Text>
-          </View>
-        ) : (
-          products.map((product) => (
-            <ProductCard
-              key={product.productId}
-              product={product}
-              isExpanded={expandedId === product.productId}
-              onToggle={toggleExpand}
-              onEdit={openEditModal}
-              onDelete={handleDelete}
-              colors={colors}
-            />
-          ))
+      <FlatList
+        data={products}
+        keyExtractor={(item) => item.productId}
+        contentContainerStyle={styles.container}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={ListEmpty}
+        ListFooterComponent={<View style={{ height: 100 }} />}
+        renderItem={({ item }) => (
+          <ProductCard
+            product={item}
+            isExpanded={expandedId === item.productId}
+            onToggle={toggleExpand}
+            onEdit={openEditModal}
+            onDelete={handleDelete}
+            colors={colors}
+          />
         )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      />
 
       {/* FAB */}
       <TouchableOpacity

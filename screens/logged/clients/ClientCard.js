@@ -1,4 +1,4 @@
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, FlatList } from "react-native";
 import { Text, Card, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { OrderCard } from "./OrderCard";
@@ -94,19 +94,23 @@ export function ClientCard({
               {activeOrders.length > 0 && (
                 <Text style={[styles.sectionLabel, { color: colors.text }]}>Pedidos ativos</Text>
               )}
-              {activeOrders.map((order) => (
-                <OrderCard
-                  key={order.orderId}
-                  order={order}
-                  clientId={client.clientId}
-                  isExpanded={expandedOrderId === order.orderId}
-                  onToggle={onToggleOrder}
-                  onPayInstallment={onPayInstallment}
-                  onAddInstallment={onAddInstallment}
-                  onCancelOrder={onCancelOrder}
-                  colors={colors}
-                />
-              ))}
+              <FlatList
+                data={activeOrders}
+                keyExtractor={(order) => order.orderId}
+                scrollEnabled={false}
+                renderItem={({ item: order }) => (
+                  <OrderCard
+                    order={order}
+                    clientId={client.clientId}
+                    isExpanded={expandedOrderId === order.orderId}
+                    onToggle={onToggleOrder}
+                    onPayInstallment={onPayInstallment}
+                    onAddInstallment={onAddInstallment}
+                    onCancelOrder={onCancelOrder}
+                    colors={colors}
+                  />
+                )}
+              />
 
               {/* Pedidos cancelados */}
               {cancelledOrders.length > 0 && (
@@ -114,17 +118,26 @@ export function ClientCard({
                   <Text style={[styles.sectionLabel, { color: colors.text, opacity: 0.5 }]}>
                     Cancelados
                   </Text>
-                  {cancelledOrders.map((order) => (
-                    <View
-                      key={order.orderId}
-                      style={[styles.orderCard, { backgroundColor: colors.background, opacity: 0.5 }]}
-                    >
-                      <Text style={[styles.orderTitle, { color: colors.text }]}>
-                        {order.productRef || "Pedido"}
-                      </Text>
-                      <Text style={[styles.orderSubtitle, { color: colors.text }]}>Cancelado ✕</Text>
-                    </View>
-                  ))}
+                  <FlatList
+                    data={cancelledOrders}
+                    keyExtractor={(order) => order.orderId}
+                    scrollEnabled={false}
+                    renderItem={({ item: order }) => (
+                      <View
+                        style={[
+                          styles.orderCard,
+                          { backgroundColor: colors.background, opacity: 0.5 },
+                        ]}
+                      >
+                        <Text style={[styles.orderTitle, { color: colors.text }]}>
+                          {order.productRef || "Pedido"}
+                        </Text>
+                        <Text style={[styles.orderSubtitle, { color: colors.text }]}>
+                          Cancelado ✕
+                        </Text>
+                      </View>
+                    )}
+                  />
                 </>
               )}
             </Card.Content>

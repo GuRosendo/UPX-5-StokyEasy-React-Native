@@ -1,4 +1,4 @@
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, FlatList } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { toCurrencyDisplay } from "../shared/helpers";
@@ -19,6 +19,27 @@ export function OrderCard({
   const pending = order.installments
     .filter((i) => !i.paid)
     .reduce((a, i) => a + i.value, 0);
+
+  const renderInstallment = ({ item: inst }) => (
+    <View style={styles.installmentRow}>
+      <Text style={[styles.installmentText, { color: colors.text }]}>
+        {inst.index}ª parcela — {toCurrencyDisplay(inst.value)}
+      </Text>
+      {inst.paid ? (
+        <View style={styles.paidBadge}>
+          <FontAwesome6 name="check" size={11} color="#27ae60" />
+          <Text style={styles.paidText}>Pago</Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.payButton, { borderColor: colors.mediumRed }]}
+          onPress={() => onPayInstallment(clientId, order.orderId, inst.installmentId)}
+        >
+          <Text style={[styles.payButtonText, { color: colors.mediumRed }]}>Quitar</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
 
   return (
     <View style={[styles.orderCard, { backgroundColor: colors.background }]}>
@@ -45,26 +66,12 @@ export function OrderCard({
       {/* Detalhes expandidos */}
       {isExpanded && (
         <View style={styles.installmentList}>
-          {order.installments.map((inst) => (
-            <View key={inst.installmentId} style={styles.installmentRow}>
-              <Text style={[styles.installmentText, { color: colors.text }]}>
-                {inst.index}ª parcela — {toCurrencyDisplay(inst.value)}
-              </Text>
-              {inst.paid ? (
-                <View style={styles.paidBadge}>
-                  <FontAwesome6 name="check" size={11} color="#27ae60" />
-                  <Text style={styles.paidText}>Pago</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.payButton, { borderColor: colors.mediumRed }]}
-                  onPress={() => onPayInstallment(clientId, order.orderId, inst.installmentId)}
-                >
-                  <Text style={[styles.payButtonText, { color: colors.mediumRed }]}>Quitar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+          <FlatList
+            data={order.installments}
+            keyExtractor={(inst) => inst.installmentId}
+            renderItem={renderInstallment}
+            scrollEnabled={false}
+          />
 
           <View style={[styles.actionRow, { marginTop: 10 }]}>
             <Button
