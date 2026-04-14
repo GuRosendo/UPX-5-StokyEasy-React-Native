@@ -5,13 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -20,10 +18,8 @@
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização durante o uso."
       }
     },
-
     "android": {
       "package": "com.stokyeasy.app",
-
       "permissions": [
         "INTERNET",
         "READ_EXTERNAL_STORAGE",
@@ -37,19 +33,32 @@
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION"
       ],
-
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": { "scheme": "https" },
-          "category": ["BROWSABLE"]
+          "data": {
+            "scheme": "https"
+          },
+          "category": [
+            "BROWSABLE"
+          ]
         },
         {
           "action": "VIEW",
-          "data": { "scheme": "stokyeasy" },
-          "category": ["DEFAULT", "BROWSABLE"]
+          "data": {
+            "scheme": "stokyeasy"
+          },
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ]
         }
       ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fe98984b-3f94-471e-a224-1b75e81d359e"
+      }
     }
   }
 }
