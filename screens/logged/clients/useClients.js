@@ -3,6 +3,20 @@ import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { parseCurrency } from "../shared/helpers";
+import {
+  initDatabase,
+  getClients,
+  upsertClient,
+  deleteClient,
+  getProducts,
+  upsertProduct,
+  updateProductQuantity,
+  insertOrder,
+  updateOrderStatus,
+  updateOrderTotalValue,
+  setInstallmentPaid,
+  insertInstallment,
+} from "../shared/database";
 
 const EMPTY_CLIENT = { name: "", email: "", phone: "" };
 const EMPTY_ORDER_ITEM = { productId: "", quantity: "", installments: "" };
@@ -29,32 +43,29 @@ export function useClients() {
   const [addInstallmentValue, setAddInstallmentValue] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState(null);
 
+  // Busca
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
+
   // ── Carregar ────────────────────────────────────────────────────────────────
 
   useFocusEffect(
     useCallback(() => {
-      loadClients();
+      initDatabase();
+      loadData();
     }, [])
   );
 
-  const loadClients = async () => {
+  const loadData = async () => {
     const loggedUser = await AsyncStorage.getItem("userData");
     if (!loggedUser) return;
     const user = JSON.parse(loggedUser);
 
-    const stored = await AsyncStorage.getItem("clients");
-    const list = stored ? JSON.parse(stored) : [];
-    setClients(
-      list.filter((c) => c.userId === user.id).sort((a, b) => b.createdAt - a.createdAt)
-    );
+    const clientsList = getClients(user.id);
+    setClients(clientsList.sort((a, b) => b.createdAt - a.createdAt));
 
-    const storedProducts = await AsyncStorage.getItem("products");
-    const products = storedProducts ? JSON.parse(storedProducts) : [];
-    setUserProducts(products.filter((p) => p.userId === user.id));
-  };
-
-  const saveClients = async (list) => {
-    await AsyncStorage.setItem("clients", JSON.stringify(list));
+    const productsList = getProducts(user.id);
+    setUserProducts(productsList);
   };
 
   // ── CRUD Clientes ───────────────────────────────────────────────────────────
@@ -87,30 +98,26 @@ export function useClients() {
     if (!loggedUser) return;
     const user = JSON.parse(loggedUser);
 
-    const stored = await AsyncStorage.getItem("clients");
-    let list = stored ? JSON.parse(stored) : [];
+    const now = Date.now();
+    const client = editingClient
+      ? {
+          ...editingClient,
+          name: clientForm.name.trim(),
+          email: clientForm.email.trim(),
+          phone: clientForm.phone,
+        }
+      : {
+          clientId: `cli_${now}_${Math.random().toString(36).slice(2)}`,
+          userId: user.id,
+          name: clientForm.name.trim(),
+          email: clientForm.email.trim(),
+          phone: clientForm.phone,
+          createdAt: now,
+        };
 
-    if (editingClient) {
-      list = list.map((c) =>
-        c.clientId === editingClient.clientId
-          ? { ...c, name: clientForm.name.trim(), email: clientForm.email.trim(), phone: clientForm.phone }
-          : c
-      );
-    } else {
-      list.push({
-        clientId: `cli_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        userId: user.id,
-        name: clientForm.name.trim(),
-        email: clientForm.email.trim(),
-        phone: clientForm.phone,
-        orders: [],
-        createdAt: Date.now(),
-      });
-    }
-
-    await saveClients(list);
+    upsertClient(client);
     closeClientModal();
-    loadClients();
+    loadData();
   };
 
   const handleDeleteClient = (client) => {
@@ -122,19 +129,16 @@ export function useClients() {
         {
           text: "Excluir",
           style: "destructive",
-          onPress: async () => {
-            const stored = await AsyncStorage.getItem("clients");
-            let list = stored ? JSON.parse(stored) : [];
-            list = list.filter((c) => c.clientId !== client.clientId);
-            await saveClients(list);
-            loadClients();
+          onPress: () => {
+            deleteClient(client.clientId);
+            loadData();
           },
         },
       ]
     );
   };
 
-  // ── Pedidos (múltiplos itens) ───────────────────────────────────────────────
+  // ── Pedidos ────────────────────────────────────────────────────────────────
 
   const openCreateOrder = (clientId) => {
     setSelectedClientId(clientId);
@@ -189,8 +193,11 @@ export function useClients() {
       }
     }
 
-    const storedProducts = await AsyncStorage.getItem("products");
-    let products = storedProducts ? JSON.parse(storedProducts) : [];
+    const loggedUser = await AsyncStorage.getItem("userData");
+    if (!loggedUser) return;
+    const user = JSON.parse(loggedUser);
+
+    const products = getProducts(user.id);
 
     for (let i = 0; i < orderItems.length; i++) {
       const item = orderItems[i];
@@ -201,81 +208,74 @@ export function useClients() {
         return;
       }
       if (product.quantity < qty) {
-        Alert.alert("Estoque insuficiente", `Item ${i + 1}: disponível ${product.quantity} un. de "${product.name}".`);
+        Alert.alert(
+          "Estoque insuficiente",
+          `Item ${i + 1}: disponível ${product.quantity} un. de "${product.name}".`
+        );
         return;
       }
     }
 
     const now = Date.now();
-    const newOrders = orderItems.map((item, i) => {
+
+    for (let i = 0; i < orderItems.length; i++) {
+      const item = orderItems[i];
       const qty = parseInt(item.quantity, 10);
       const inst = parseInt(item.installments, 10);
       const product = products.find((p) => p.productId === item.productId);
       const total = product.price * qty;
       const installmentValue = total / inst;
 
-      products = products.map((p) =>
-        p.productId === item.productId ? { ...p, quantity: p.quantity - qty } : p
-      );
+      // Deduzir estoque
+      updateProductQuantity(product.productId, product.quantity - qty);
 
-      return {
+      const order = {
         orderId: `ord_${now}_${i}_${Math.random().toString(36).slice(2)}`,
         clientId: selectedClientId,
+        userId: user.id,
         totalValue: total,
         quantity: qty,
-        installments: Array.from({ length: inst }, (_, j) => ({
-          installmentId: `inst_${now}_${i}_${j}`,
-          index: j + 1,
-          value: installmentValue,
-          paid: false,
-          paidAt: null,
-        })),
         status: "active",
         productRef: product.name,
         productId: product.productId,
         createdAt: now,
+        installments: Array.from({ length: inst }, (_, j) => ({
+          installmentId: `inst_${now}_${i}_${j}`,
+          index: j + 1,
+          value: installmentValue,
+        })),
       };
-    });
 
-    await AsyncStorage.setItem("products", JSON.stringify(products));
+      insertOrder(order);
+    }
 
-    const stored = await AsyncStorage.getItem("clients");
-    let list = stored ? JSON.parse(stored) : [];
-    list = list.map((c) =>
-      c.clientId === selectedClientId
-        ? { ...c, orders: [...(c.orders || []), ...newOrders] }
-        : c
-    );
-
-    await saveClients(list);
     closeOrderModal();
-    loadClients();
+    loadData();
   };
 
   // ── Parcelas ────────────────────────────────────────────────────────────────
 
-  const handlePayInstallment = async (clientId, orderId, installmentId) => {
-    const stored = await AsyncStorage.getItem("clients");
-    let list = stored ? JSON.parse(stored) : [];
-    list = list.map((c) => {
-      if (c.clientId !== clientId) return c;
-      return {
-        ...c,
-        orders: c.orders.map((o) => {
-          if (o.orderId !== orderId) return o;
-          return {
-            ...o,
-            installments: o.installments.map((inst) =>
-              inst.installmentId === installmentId
-                ? { ...inst, paid: true, paidAt: Date.now() }
-                : inst
-            ),
-          };
-        }),
-      };
-    });
-    await saveClients(list);
-    loadClients();
+  const handlePayInstallment = (clientId, orderId, installmentId) => {
+    setInstallmentPaid(installmentId, true);
+    loadData();
+  };
+
+  const handleUnpayInstallment = (clientId, orderId, installmentId) => {
+    Alert.alert(
+      "Cancelar pagamento",
+      "Deseja marcar esta parcela como não paga?",
+      [
+        { text: "Voltar", style: "cancel" },
+        {
+          text: "Confirmar",
+          style: "destructive",
+          onPress: () => {
+            setInstallmentPaid(installmentId, false);
+            loadData();
+          },
+        },
+      ]
+    );
   };
 
   const openAddInstallment = (orderId) => {
@@ -284,37 +284,32 @@ export function useClients() {
     setAddInstallmentModal(true);
   };
 
-  const handleAddInstallment = async (clientId) => {
+  const handleAddInstallment = (clientId) => {
     const value = parseCurrency(addInstallmentValue);
     if (!value || value <= 0) {
       Alert.alert("Valor inválido", "Informe um valor válido para a parcela.");
       return;
     }
 
-    const stored = await AsyncStorage.getItem("clients");
-    let list = stored ? JSON.parse(stored) : [];
-    list = list.map((c) => {
-      if (c.clientId !== clientId) return c;
-      return {
-        ...c,
-        orders: c.orders.map((o) => {
-          if (o.orderId !== selectedOrderId) return o;
-          const newInst = {
-            installmentId: `inst_${Date.now()}`,
-            index: o.installments.length + 1,
-            value,
-            paid: false,
-            paidAt: null,
-          };
-          return { ...o, totalValue: o.totalValue + value, installments: [...o.installments, newInst] };
-        }),
-      };
+    // Buscar pedido para saber o índice atual
+    const client = clients.find((c) => c.clientId === clientId);
+    const order = client?.orders?.find((o) => o.orderId === selectedOrderId);
+    if (!order) return;
+
+    const newIndex = order.installments.length + 1;
+
+    insertInstallment({
+      installmentId: `inst_${Date.now()}`,
+      orderId: selectedOrderId,
+      index: newIndex,
+      value,
     });
 
-    await saveClients(list);
+    updateOrderTotalValue(selectedOrderId, order.totalValue + value);
+
     setAddInstallmentModal(false);
     setSelectedOrderId(null);
-    loadClients();
+    loadData();
   };
 
   const handleCancelOrder = (clientId, orderId) => {
@@ -324,36 +319,23 @@ export function useClients() {
         text: "Cancelar pedido",
         style: "destructive",
         onPress: async () => {
-          const stored = await AsyncStorage.getItem("clients");
-          let list = stored ? JSON.parse(stored) : [];
+          const client = clients.find((c) => c.clientId === clientId);
+          const order = client?.orders?.find((o) => o.orderId === orderId);
 
-          let cancelledProductId = null;
-          let cancelledQty = 0;
-
-          list = list.map((c) => {
-            if (c.clientId !== clientId) return c;
-            return {
-              ...c,
-              orders: c.orders.map((o) => {
-                if (o.orderId !== orderId) return o;
-                cancelledProductId = o.productId;
-                cancelledQty = o.quantity || 1;
-                return { ...o, status: "cancelled" };
-              }),
-            };
-          });
-
-          if (cancelledProductId) {
-            const storedProducts = await AsyncStorage.getItem("products");
-            let products = storedProducts ? JSON.parse(storedProducts) : [];
-            products = products.map((p) =>
-              p.productId === cancelledProductId ? { ...p, quantity: p.quantity + cancelledQty } : p
-            );
-            await AsyncStorage.setItem("products", JSON.stringify(products));
+          if (order && order.productId && order.quantity) {
+            const loggedUser = await AsyncStorage.getItem("userData");
+            if (loggedUser) {
+              const user = JSON.parse(loggedUser);
+              const products = getProducts(user.id);
+              const product = products.find((p) => p.productId === order.productId);
+              if (product) {
+                updateProductQuantity(product.productId, product.quantity + order.quantity);
+              }
+            }
           }
 
-          await saveClients(list);
-          loadClients();
+          updateOrderStatus(orderId, "cancelled");
+          loadData();
         },
       },
     ]);
@@ -363,6 +345,24 @@ export function useClients() {
 
   const toggleClient = (id) => setExpandedClientId((prev) => (prev === id ? null : id));
   const toggleOrder = (id) => setExpandedOrderId((prev) => (prev === id ? null : id));
+
+  // ── Busca ────────────────────────────────────────────────────────────────────
+
+  const toggleSearch = () => {
+    setSearchVisible((v) => {
+      if (v) setSearchQuery("");
+      return !v;
+    });
+  };
+
+  const filteredClients = searchQuery.trim()
+    ? clients.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (c.phone || "").includes(searchQuery)
+      )
+    : clients;
 
   // ── Derivados ───────────────────────────────────────────────────────────────
 
@@ -376,19 +376,27 @@ export function useClients() {
       acc +
       (c.orders || [])
         .filter((o) => o.status === "active")
-        .reduce((s, o) => s + o.installments.filter((i) => !i.paid).reduce((a, i) => a + i.value, 0), 0),
+        .reduce(
+          (s, o) =>
+            s + o.installments.filter((i) => !i.paid).reduce((a, i) => a + i.value, 0),
+          0
+        ),
     0
   );
 
   return {
-    // dados
-    clients,
+    clients: filteredClients,
+    allClients: clients,
     userProducts,
     expandedClientId,
     expandedOrderId,
     totalClients,
     totalActiveOrders,
     totalPending,
+    searchQuery,
+    setSearchQuery,
+    searchVisible,
+    toggleSearch,
     // modal cliente
     clientModal,
     editingClient,
@@ -420,6 +428,7 @@ export function useClients() {
     setAddInstallmentModal,
     // ações
     handlePayInstallment,
+    handleUnpayInstallment,
     handleCancelOrder,
     toggleClient,
     toggleOrder,

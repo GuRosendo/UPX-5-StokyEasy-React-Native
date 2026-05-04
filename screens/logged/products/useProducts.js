@@ -3,8 +3,32 @@ import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatCurrency, parseCurrency } from "../shared/helpers";
+import {
+  initDatabase,
+  getProducts,
+  upsertProduct,
+  deleteProduct,
+} from "../shared/database";
 
-const EMPTY_FORM = { name: "", quantity: "", price: "", description: "" };
+const EMPTY_FORM = { name: "", quantity: "", price: "", description: "", category: "Outros" };
+
+export const PRODUCT_CATEGORIES = [
+  "Alimentos",
+  "Bebidas",
+  "Perecíveis",
+  "Higiene & Limpeza",
+  "Roupas & Calçados",
+  "Eletrodomésticos",
+  "Eletrônicos",
+  "Móveis & Decoração",
+  "Ferramentas",
+  "Papelaria",
+  "Brinquedos",
+  "Saúde & Beleza",
+  "Automotivo",
+  "Esportes",
+  "Outros",
+];
 
 export function useProducts() {
   const [products, setProducts] = useState([]);
@@ -12,11 +36,14 @@ export function useProducts() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [expandedId, setExpandedId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchVisible, setSearchVisible] = useState(false);
 
   // ── Carregar ────────────────────────────────────────────────────────────────
 
   useFocusEffect(
     useCallback(() => {
+      initDatabase();
       loadProducts();
     }, [])
   );
@@ -25,13 +52,8 @@ export function useProducts() {
     const loggedUser = await AsyncStorage.getItem("userData");
     if (!loggedUser) return;
     const user = JSON.parse(loggedUser);
-
-    const stored = await AsyncStorage.getItem("products");
-    const list = stored ? JSON.parse(stored) : [];
-    const userProducts = list
-      .filter((p) => p.userId === user.id)
-      .sort((a, b) => b.createdAt - a.createdAt);
-    setProducts(userProducts);
+    const list = getProducts(user.id);
+    setProducts(list);
   };
 
   // ── Modal ───────────────────────────────────────────────────────────────────
@@ -49,6 +71,7 @@ export function useProducts() {
       quantity: String(product.quantity),
       price: formatCurrency(String(Math.round(product.price * 100))),
       description: product.description || "",
+      category: product.category || "Outros",
     });
     setModalVisible(true);
   };
@@ -79,36 +102,30 @@ export function useProducts() {
     if (!loggedUser) return;
     const user = JSON.parse(loggedUser);
 
-    const stored = await AsyncStorage.getItem("products");
-    let list = stored ? JSON.parse(stored) : [];
+    const now = Date.now();
+    const product = editingProduct
+      ? {
+          ...editingProduct,
+          name: form.name.trim(),
+          quantity: parseInt(form.quantity, 10),
+          price: parseCurrency(form.price),
+          description: form.description.trim(),
+          category: form.category,
+          updatedAt: now,
+        }
+      : {
+          productId: `prod_${now}_${Math.random().toString(36).slice(2)}`,
+          userId: user.id,
+          name: form.name.trim(),
+          quantity: parseInt(form.quantity, 10),
+          price: parseCurrency(form.price),
+          description: form.description.trim(),
+          category: form.category,
+          createdAt: now,
+          updatedAt: now,
+        };
 
-    if (editingProduct) {
-      list = list.map((p) =>
-        p.productId === editingProduct.productId
-          ? {
-              ...p,
-              name: form.name.trim(),
-              quantity: parseInt(form.quantity, 10),
-              price: parseCurrency(form.price),
-              description: form.description.trim(),
-              updatedAt: Date.now(),
-            }
-          : p
-      );
-    } else {
-      list.push({
-        productId: `prod_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        userId: user.id,
-        name: form.name.trim(),
-        quantity: parseInt(form.quantity, 10),
-        price: parseCurrency(form.price),
-        description: form.description.trim(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    }
-
-    await AsyncStorage.setItem("products", JSON.stringify(list));
+    upsertProduct(product);
     closeModal();
     loadProducts();
   };
@@ -122,11 +139,8 @@ export function useProducts() {
         {
           text: "Excluir",
           style: "destructive",
-          onPress: async () => {
-            const stored = await AsyncStorage.getItem("products");
-            let list = stored ? JSON.parse(stored) : [];
-            list = list.filter((p) => p.productId !== product.productId);
-            await AsyncStorage.setItem("products", JSON.stringify(list));
+          onPress: () => {
+            deleteProduct(product.productId);
             loadProducts();
           },
         },
@@ -139,13 +153,32 @@ export function useProducts() {
   const toggleExpand = (productId) =>
     setExpandedId((prev) => (prev === productId ? null : productId));
 
+  // ── Busca ────────────────────────────────────────────────────────────────────
+
+  const toggleSearch = () => {
+    setSearchVisible((v) => {
+      if (v) setSearchQuery("");
+      return !v;
+    });
+  };
+
+  const filteredProducts = searchQuery.trim()
+    ? products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (p.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (p.description || "").toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : products;
+
   // ── Derivados ───────────────────────────────────────────────────────────────
 
   const totalStock = products.reduce((acc, p) => acc + p.quantity, 0);
   const totalValue = products.reduce((acc, p) => acc + p.price * p.quantity, 0);
 
   return {
-    products,
+    products: filteredProducts,
+    allProducts: products,
     modalVisible,
     editingProduct,
     form,
@@ -153,6 +186,10 @@ export function useProducts() {
     expandedId,
     totalStock,
     totalValue,
+    searchQuery,
+    setSearchQuery,
+    searchVisible,
+    toggleSearch,
     openCreateModal,
     openEditModal,
     closeModal,

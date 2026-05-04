@@ -29,6 +29,16 @@ export function ProductCard({ product, isExpanded, onToggle, onEdit, onDelete, c
 
         {isExpanded && (
           <Card.Content style={styles.expandedContent}>
+            {/* Badge de categoria */}
+            {product.category ? (
+              <View style={[styles.categoryBadge, { backgroundColor: colors.mediumRedOpaque }]}>
+                <FontAwesome6 name="tag" size={11} color={colors.mediumRed} />
+                <Text style={[styles.categoryBadgeText, { color: colors.mediumRed }]}>
+                  {product.category}
+                </Text>
+              </View>
+            ) : null}
+
             {product.description ? (
               <Text style={[styles.descriptionText, { color: colors.text }]}>
                 <FontAwesome6 name="align-left" size={14} color={colors.mediumRed} />{" "}

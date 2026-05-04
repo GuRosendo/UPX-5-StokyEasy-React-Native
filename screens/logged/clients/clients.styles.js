@@ -10,6 +10,19 @@ export const styles = StyleSheet.create({
   summaryValue: { fontSize: 13, fontWeight: "700", textAlign: "center" },
   summaryLabel: { fontSize: 10, opacity: 0.6, textAlign: "center" },
 
+  // Busca
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 2 },
+
   emptyContainer: { alignItems: "center", marginTop: 60, gap: 12 },
   empty: { textAlign: "center", opacity: 0.5, fontSize: 15 },
 
@@ -44,10 +57,16 @@ export const styles = StyleSheet.create({
   payButton: { borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 },
   payButtonText: { fontSize: 12, fontWeight: "600" },
 
-  fab: {
+  // FABs
+  fabRow: {
     position: "absolute",
     bottom: 28,
     right: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  fab: {
     width: 58,
     height: 58,
     borderRadius: 29,
@@ -58,6 +77,18 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  fabSecondary: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
 
   // Modal base

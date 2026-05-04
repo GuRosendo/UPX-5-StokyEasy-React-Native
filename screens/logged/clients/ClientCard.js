@@ -14,6 +14,7 @@ export function ClientCard({
   onEditClient,
   onDeleteClient,
   onPayInstallment,
+  onUnpayInstallment,
   onAddInstallment,
   onCancelOrder,
   colors,
@@ -105,6 +106,7 @@ export function ClientCard({
                     isExpanded={expandedOrderId === order.orderId}
                     onToggle={onToggleOrder}
                     onPayInstallment={onPayInstallment}
+                    onUnpayInstallment={onUnpayInstallment}
                     onAddInstallment={onAddInstallment}
                     onCancelOrder={onCancelOrder}
                     colors={colors}

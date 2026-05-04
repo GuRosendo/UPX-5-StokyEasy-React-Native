@@ -10,6 +10,7 @@ import {
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { formatCurrency } from "../shared/helpers";
+import { PRODUCT_CATEGORIES } from "./useProducts";
 import { styles } from "./products.styles";
 
 export function ProductModal({ visible, editingProduct, form, setForm, onSave, onClose, colors }) {
@@ -41,14 +42,7 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
             {/* Nome */}
             <Text style={[styles.label, { color: colors.text }]}>Nome *</Text>
             <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: colors.mediumRed,
-                  color: colors.text,
-                  backgroundColor: colors.background,
-                },
-              ]}
+              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
               placeholder="Ex: Camiseta Básica"
               placeholderTextColor={colors.text + "66"}
               value={form.name}
@@ -56,19 +50,47 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
               returnKeyType="next"
             />
 
+            {/* Categoria */}
+            <Text style={[styles.label, { color: colors.text }]}>Categoria *</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 4 }}
+              contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+            >
+              {PRODUCT_CATEGORIES.map((cat) => {
+                const selected = form.category === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setForm({ ...form, category: cat })}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: selected ? colors.mediumRed : colors.background,
+                        borderColor: selected ? colors.mediumRed : colors.text + "33",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        { color: selected ? "#fff" : colors.text },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
             {/* Quantidade + Valor */}
             <View style={styles.row}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={[styles.label, { color: colors.text }]}>Quantidade *</Text>
                 <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      borderColor: colors.mediumRed,
-                      color: colors.text,
-                      backgroundColor: colors.background,
-                    },
-                  ]}
+                  style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
                   placeholder="0"
                   placeholderTextColor={colors.text + "66"}
                   keyboardType="numeric"
@@ -80,14 +102,7 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[styles.label, { color: colors.text }]}>Valor (R$) *</Text>
                 <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      borderColor: colors.mediumRed,
-                      color: colors.text,
-                      backgroundColor: colors.background,
-                    },
-                  ]}
+                  style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
                   placeholder="0,00"
                   placeholderTextColor={colors.text + "66"}
                   keyboardType="numeric"
@@ -101,15 +116,7 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
             {/* Descrição */}
             <Text style={[styles.label, { color: colors.text }]}>Descrição</Text>
             <TextInput
-              style={[
-                styles.input,
-                styles.textArea,
-                {
-                  borderColor: colors.mediumRed,
-                  color: colors.text,
-                  backgroundColor: colors.background,
-                },
-              ]}
+              style={[styles.input, styles.textArea, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
               placeholder="Detalhes adicionais do produto..."
               placeholderTextColor={colors.text + "66"}
               value={form.description}

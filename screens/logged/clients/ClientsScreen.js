@@ -1,4 +1,4 @@
-import { View, FlatList, TouchableOpacity } from "react-native";
+import { View, FlatList, TouchableOpacity, TextInput } from "react-native";
 import { Text } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { useTheme } from "../../../components/ThemeContext";
@@ -16,12 +16,17 @@ export default function ClientsScreen() {
 
   const {
     clients,
+    allClients,
     userProducts,
     expandedClientId,
     expandedOrderId,
     totalClients,
     totalActiveOrders,
     totalPending,
+    searchQuery,
+    setSearchQuery,
+    searchVisible,
+    toggleSearch,
     clientModal,
     editingClient,
     clientForm,
@@ -49,6 +54,7 @@ export default function ClientsScreen() {
     handleAddInstallment,
     setAddInstallmentModal,
     handlePayInstallment,
+    handleUnpayInstallment,
     handleCancelOrder,
     toggleClient,
     toggleOrder,
@@ -80,6 +86,27 @@ export default function ClientsScreen() {
           <Text style={[styles.summaryLabel, { color: colors.text }]}>A receber</Text>
         </View>
       </View>
+
+      {/* Barra de busca */}
+      {searchVisible && (
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.mediumRed }]}>
+          <FontAwesome6 name="magnifying-glass" size={14} color={colors.text} style={{ opacity: 0.5 }} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Buscar por nome, email, telefone..."
+            placeholderTextColor={colors.text + "66"}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <FontAwesome6 name="xmark" size={14} color={colors.text} style={{ opacity: 0.5 }} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </>
   );
 
@@ -87,7 +114,7 @@ export default function ClientsScreen() {
     <View style={styles.emptyContainer}>
       <FontAwesome6 name="user-slash" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
       <Text style={[styles.empty, { color: colors.text }]}>
-        Nenhum cliente cadastrado ainda.
+        {searchQuery ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
       </Text>
     </View>
   );
@@ -112,6 +139,7 @@ export default function ClientsScreen() {
             onEditClient={openEditClient}
             onDeleteClient={handleDeleteClient}
             onPayInstallment={handlePayInstallment}
+            onUnpayInstallment={handleUnpayInstallment}
             onAddInstallment={openAddInstallment}
             onCancelOrder={handleCancelOrder}
             colors={colors}
@@ -119,14 +147,31 @@ export default function ClientsScreen() {
         )}
       />
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.mediumRed }]}
-        onPress={openCreateClient}
-        activeOpacity={0.85}
-      >
-        <FontAwesome6 name="user-plus" size={20} color="#fff" />
-      </TouchableOpacity>
+      {/* FABs */}
+      <View style={styles.fabRow}>
+        <TouchableOpacity
+          style={[
+            styles.fabSecondary,
+            { backgroundColor: searchVisible ? colors.mediumRed : colors.card },
+          ]}
+          onPress={toggleSearch}
+          activeOpacity={0.85}
+        >
+          <FontAwesome6
+            name="magnifying-glass"
+            size={18}
+            color={searchVisible ? "#fff" : colors.mediumRed}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.mediumRed }]}
+          onPress={openCreateClient}
+          activeOpacity={0.85}
+        >
+          <FontAwesome6 name="user-plus" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Modal de cliente */}
       <ClientModal

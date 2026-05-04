@@ -1,4 +1,4 @@
-import { View, FlatList, TouchableOpacity } from "react-native";
+import { View, FlatList, TouchableOpacity, TextInput } from "react-native";
 import { Text } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { useTheme } from "../../../components/ThemeContext";
@@ -13,6 +13,7 @@ export default function ProductsScreen() {
 
   const {
     products,
+    allProducts,
     modalVisible,
     editingProduct,
     form,
@@ -20,6 +21,10 @@ export default function ProductsScreen() {
     expandedId,
     totalStock,
     totalValue,
+    searchQuery,
+    setSearchQuery,
+    searchVisible,
+    toggleSearch,
     openCreateModal,
     openEditModal,
     closeModal,
@@ -38,7 +43,7 @@ export default function ProductsScreen() {
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
           <FontAwesome6 name="boxes-stacked" size={20} color={colors.mediumRed} />
-          <Text style={[styles.summaryValue, { color: colors.text }]}>{products.length}</Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{allProducts.length}</Text>
           <Text style={[styles.summaryLabel, { color: colors.text }]}>Produtos</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
@@ -54,6 +59,27 @@ export default function ProductsScreen() {
           <Text style={[styles.summaryLabel, { color: colors.text }]}>Valor total</Text>
         </View>
       </View>
+
+      {/* Barra de busca */}
+      {searchVisible && (
+        <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.mediumRed }]}>
+          <FontAwesome6 name="magnifying-glass" size={14} color={colors.text} style={{ opacity: 0.5 }} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Buscar por nome, categoria..."
+            placeholderTextColor={colors.text + "66"}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <FontAwesome6 name="xmark" size={14} color={colors.text} style={{ opacity: 0.5 }} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </>
   );
 
@@ -61,7 +87,7 @@ export default function ProductsScreen() {
     <View style={styles.emptyContainer}>
       <FontAwesome6 name="box-open" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
       <Text style={[styles.empty, { color: colors.text }]}>
-        Nenhum produto cadastrado ainda.
+        {searchQuery ? "Nenhum produto encontrado." : "Nenhum produto cadastrado ainda."}
       </Text>
     </View>
   );
@@ -87,14 +113,31 @@ export default function ProductsScreen() {
         )}
       />
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.mediumRed }]}
-        onPress={openCreateModal}
-        activeOpacity={0.85}
-      >
-        <FontAwesome6 name="plus" size={22} color="#fff" />
-      </TouchableOpacity>
+      {/* FABs */}
+      <View style={styles.fabRow}>
+        <TouchableOpacity
+          style={[
+            styles.fabSecondary,
+            { backgroundColor: searchVisible ? colors.mediumRed : colors.card },
+          ]}
+          onPress={toggleSearch}
+          activeOpacity={0.85}
+        >
+          <FontAwesome6
+            name="magnifying-glass"
+            size={18}
+            color={searchVisible ? "#fff" : colors.mediumRed}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.mediumRed }]}
+          onPress={openCreateModal}
+          activeOpacity={0.85}
+        >
+          <FontAwesome6 name="plus" size={22} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Modal */}
       <ProductModal

@@ -10,6 +10,7 @@ export function OrderCard({
   isExpanded,
   onToggle,
   onPayInstallment,
+  onUnpayInstallment,
   onAddInstallment,
   onCancelOrder,
   colors,
@@ -26,10 +27,14 @@ export function OrderCard({
         {inst.index}ª parcela — {toCurrencyDisplay(inst.value)}
       </Text>
       {inst.paid ? (
-        <View style={styles.paidBadge}>
+        <TouchableOpacity
+          style={styles.paidBadge}
+          onPress={() => onUnpayInstallment(clientId, order.orderId, inst.installmentId)}
+          activeOpacity={0.7}
+        >
           <FontAwesome6 name="check" size={11} color="#27ae60" />
           <Text style={styles.paidText}>Pago</Text>
-        </View>
+        </TouchableOpacity>
       ) : (
         <TouchableOpacity
           style={[styles.payButton, { borderColor: colors.mediumRed }]}

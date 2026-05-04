@@ -14,6 +14,8 @@ import { loadThemeFromStorage } from "./components/LoadThemeFromStorage";
 import { handleMessage } from "./components/general/ToastMessage";
 import { PageTitle } from "./components/general/styles";
 
+import { initDatabase } from "./screens/logged/shared/database";
+
 const toastConfig = {
   success: (props) => (
     <BaseToast
@@ -100,6 +102,7 @@ export default function Index() {
     const checkTheme = async () => {
       await loadThemeFromStorage(setTheme, setThemeBackground);
 
+      initDatabase();
       checkLogin();
     }
     
