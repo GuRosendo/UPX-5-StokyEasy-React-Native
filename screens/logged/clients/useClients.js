@@ -26,6 +26,12 @@ import {
 const EMPTY_CLIENT     = { name: "", email: "", phone: "" };
 const EMPTY_ORDER_ITEM = { productId: "", quantity: "", installments: "" };
 
+function addMonths(ts, n) {
+  const d = new Date(ts);
+  d.setMonth(d.getMonth() + n);
+  return d.getTime();
+}
+
 export function useClients() {
   const [clients,       setClients]       = useState([]);
   const [userProducts,  setUserProducts]  = useState([]);
@@ -42,12 +48,13 @@ export function useClients() {
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [orderItems,       setOrderItems]       = useState([{ ...EMPTY_ORDER_ITEM }]);
   const [pickerOpenIndex,  setPickerOpenIndex]  = useState(null);
+  const [orderFirstDueDate, setOrderFirstDueDate] = useState(null); // data da 1ª parcela no modal de novo pedido
 
   // Modal editar pedido
   const [editOrderModal,  setEditOrderModal]  = useState(false);
   const [editingOrder,    setEditingOrder]    = useState(null);
   const [editingClientId, setEditingClientId] = useState(null);
-  const [editingClientObj,setEditingClientObj]= useState(null); // cliente completo para WhatsApp
+  const [editingClientObj,setEditingClientObj]= useState(null);
 
   // Modal parcela
   const [addInstallmentModal, setAddInstallmentModal] = useState(false);
@@ -57,6 +64,9 @@ export function useClients() {
   // Busca
   const [searchQuery,   setSearchQuery]   = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
+
+  // Filtro de pedidos pagos/finalizados
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // ── Carregar ────────────────────────────────────────────────────────────────
 
@@ -147,6 +157,7 @@ export function useClients() {
     setOrderItems([{ ...EMPTY_ORDER_ITEM }]);
     setPickerOpenIndex(null);
     setExpandedOrderId(null);
+    setOrderFirstDueDate(null);
     setOrderModal(true);
   };
 
@@ -155,6 +166,7 @@ export function useClients() {
     setSelectedClientId(null);
     setOrderItems([{ ...EMPTY_ORDER_ITEM }]);
     setPickerOpenIndex(null);
+    setOrderFirstDueDate(null);
   };
 
   const addOrderItem    = () => { setOrderItems((p) => [...p, { ...EMPTY_ORDER_ITEM }]); setPickerOpenIndex(null); };
@@ -215,7 +227,7 @@ export function useClients() {
           installmentId: `inst_${now}_${i}_${j}`,
           index:   j + 1,
           value:   total / inst,
-          dueDate: null,
+          dueDate: orderFirstDueDate ? addMonths(orderFirstDueDate, j) : null,
         })),
       });
     }
@@ -365,8 +377,22 @@ export function useClients() {
   };
 
   /**
-   * Excluir pedido cancelado do histórico (sem mexer em estoque — já foi devolvido no cancelamento).
+   * Finalizar pedido manualmente (todas as parcelas pagas).
    */
+  const handleCompleteOrder = (clientId, orderId) => {
+    Alert.alert(
+      "Finalizar pedido",
+      "Marcar este pedido como finalizado? Ele será movido para o histórico de concluídos.",
+      [
+        { text: "Voltar", style: "cancel" },
+        {
+          text: "Finalizar",
+          onPress: () => { updateOrderStatus(orderId, "completed"); loadData(); },
+        },
+      ]
+    );
+  };
+
   const handleDeleteCancelledOrder = (clientId, orderId) => {
     Alert.alert(
       "Excluir do histórico",
@@ -385,8 +411,44 @@ export function useClients() {
   // ── Parcelas ────────────────────────────────────────────────────────────────
 
   const handlePayInstallment = (clientId, orderId, installmentId) => {
-    setInstallmentPaid(installmentId, true);
-    loadData();
+    Alert.alert(
+      "Confirmar pagamento",
+      "Marcar esta parcela como paga?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          onPress: () => {
+            setInstallmentPaid(installmentId, true);
+            // Verifica se todas as parcelas do pedido foram pagas
+            const client = clients.find((c) => c.clientId === clientId);
+            const order  = client?.orders?.find((o) => o.orderId === orderId);
+            if (order) {
+              const allPaid = order.installments.every(
+                (i) => i.installmentId === installmentId ? true : i.paid
+              );
+              if (allPaid && order.installments.length > 0) {
+                Alert.alert(
+                  "Pedido concluído!",
+                  "Todas as parcelas foram pagas. Deseja marcar este pedido como finalizado?",
+                  [
+                    { text: "Deixar ativo", style: "cancel", onPress: () => loadData() },
+                    {
+                      text: "Finalizar pedido",
+                      onPress: () => { updateOrderStatus(orderId, "completed"); loadData(); },
+                    },
+                  ]
+                );
+              } else {
+                loadData();
+              }
+            } else {
+              loadData();
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleUnpayInstallment = (clientId, orderId, installmentId) => {
@@ -435,14 +497,25 @@ export function useClients() {
   const toggleSearch = () =>
     setSearchVisible((v) => { if (v) setSearchQuery(""); return !v; });
 
-  const filteredClients = searchQuery.trim()
-    ? clients.filter(
-        (c) =>
-          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (c.phone || "").includes(searchQuery)
-      )
-    : clients;
+  const filteredClients = (() => {
+    let base = searchQuery.trim()
+      ? clients.filter(
+          (c) =>
+            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (c.phone || "").includes(searchQuery)
+        )
+      : clients;
+
+    // Se showCompleted, mostra apenas clientes que têm ao menos um pedido completed;
+    // caso contrário exclui pedidos completed dos resultados de busca normal.
+    return base.map((c) => ({
+      ...c,
+      orders: (c.orders || []).filter((o) =>
+        showCompleted ? o.status === "completed" : o.status !== "completed"
+      ),
+    })).filter((c) => (showCompleted ? c.orders.length > 0 : true));
+  })();
 
   // ── Derivados ───────────────────────────────────────────────────────────────
 
@@ -461,6 +534,9 @@ export function useClients() {
         ),
     0
   );
+  const totalCompleted = clients.reduce(
+    (acc, c) => acc + (c.orders || []).filter((o) => o.status === "completed").length, 0
+  );
 
   return {
     clients: filteredClients,
@@ -471,13 +547,16 @@ export function useClients() {
     totalClients,
     totalActiveOrders,
     totalPending,
+    totalCompleted,
     searchQuery, setSearchQuery,
     searchVisible, toggleSearch,
+    showCompleted, setShowCompleted,
     // modal cliente
     clientModal, editingClient, clientForm, setClientForm,
     openCreateClient, openEditClient, closeClientModal, handleSaveClient, handleDeleteClient,
     // modal novo pedido
     orderModal, orderItems, pickerOpenIndex, setPickerOpenIndex,
+    orderFirstDueDate, setOrderFirstDueDate,
     openCreateOrder, closeOrderModal, addOrderItem, removeOrderItem, updateOrderItem, handleSaveOrder,
     // modal editar pedido
     editOrderModal, editingOrder, editingClientId, editingClientObj,
@@ -488,6 +567,7 @@ export function useClients() {
     // ações
     handlePayInstallment, handleUnpayInstallment,
     handleCancelOrder, handleDeleteOrder,
+    handleCompleteOrder,
     handleRecoverOrder, handleDeleteCancelledOrder,
     toggleClient, toggleOrder,
   };

@@ -54,9 +54,9 @@ function buildOrderText(order, client) {
   const pendingTotal = order.installments.filter((i) => !i.paid).reduce((s, i) => s + i.value, 0);
 
   order.installments.forEach((inst) => {
-    const dateStr = inst.dueDate ? ` — venc. ${tsToDateBR(inst.dueDate)}` : "";
-    const status  = inst.paid ? "✅ Pago" : "⏳ Pendente";
-    lines.push(`  ${inst.index}ª parcela: ${toCurrencyDisplay(inst.value)}${dateStr} — ${status}`);
+    const dateStr = inst.dueDate ? ` ${tsToDateBR(inst.dueDate)} — ` : "";
+    const status  = inst.paid ? "— *Pago*" : "— *Pendente*";
+    lines.push(` Parcela: ${dateStr} ${toCurrencyDisplay(inst.value)} ${status}`);
   });
 
   lines.push("");
@@ -302,7 +302,7 @@ export function EditOrderModal({
       >
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+        <View style={[styles.modalBox, { backgroundColor: colors.background }]}>
 
           {/* ── Cabeçalho ── */}
           <View style={styles.modalHeader}>
@@ -380,6 +380,8 @@ export function EditOrderModal({
               value={quantity}
               onChangeText={(v) => setQuantity(v.replace(/\D/g, ""))}
               returnKeyType="done"
+              editable={false}
+              backgroundColor={colors.card}
             />
 
             {/* ── Resumo ── */}
@@ -391,7 +393,7 @@ export function EditOrderModal({
             </View>
 
             {/* ── Data da 1ª parcela (propaga mensalmente) ── */}
-            <View style={[styles.dueDateSection, { borderColor: colors.mediumRed + "33", backgroundColor: colors.card }]}>
+            <View style={[styles.dueDateSection, { borderColor: colors.mediumRed + "33", backgroundColor: colors.background }]}>
               <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 0, marginBottom: 8 }]}>
                 Datas de vencimento
               </Text>
@@ -406,17 +408,6 @@ export function EditOrderModal({
                     colors={colors}
                   />
                 </View>
-                {firstDateSet && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setFirstDueDate(null);
-                      setFirstDateSet(false);
-                      setInstallments((prev) => prev.map((i) => ({ ...i, dueDate: null })));
-                    }}
-                  >
-                    <FontAwesome6 name="xmark" size={16} color={colors.text} style={{ opacity: 0.4 }} />
-                  </TouchableOpacity>
-                )}
               </View>
 
               <Text style={[styles.hintText, { color: colors.text }]}>

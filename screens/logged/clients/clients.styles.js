@@ -126,9 +126,46 @@ export const styles = StyleSheet.create({
   },
   modalTitle:   { fontSize: 20, fontWeight: "700" },
   label:        { fontSize: 13, fontWeight: "600", marginBottom: 4, marginTop: 10, opacity: 0.8 },
-  input:        { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
   modalButtons: { flexDirection: "row", gap: 12, marginTop: 20, marginBottom: 8 },
   modalBtn:     { flex: 1, borderRadius: 12 },
+
+  // ── Filtro de pedidos finalizados ──────────────────────────────────────────
+  filterToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  filterToggleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+  filterBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    minWidth: 22,
+    alignItems: "center",
+  },
+  filterBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
 
   // ── WhatsApp ────────────────────────────────────────────────────────────────
   whatsappBtn: {

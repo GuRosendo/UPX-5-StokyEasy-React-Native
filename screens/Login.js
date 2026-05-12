@@ -69,7 +69,7 @@ const Login = ({ navigation, route }) => {
                         </>
                     }
 
-                    <SubTitle color={colors.text}>Seja bem vindo(a) ao <SubTitle boldOnText={true}>Eco Move!</SubTitle></SubTitle>
+                    <SubTitle color={colors.text}>Seja bem vindo(a) ao <SubTitle boldOnText={true}>StokyEasy!</SubTitle></SubTitle>
 
                     <Formik
                         initialValues={{ login: '', password: '' }}

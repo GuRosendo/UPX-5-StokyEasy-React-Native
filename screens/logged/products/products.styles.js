@@ -116,8 +116,6 @@ export const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 20, fontWeight: "700" },
   label: { fontSize: 13, fontWeight: "600", marginBottom: 4, marginTop: 10, opacity: 0.8 },
-  input: { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
-  textArea: { height: 80, paddingTop: 10 },
   row: { flexDirection: "row" },
   modalButtons: { flexDirection: "row", gap: 12, marginTop: 20, marginBottom: 8 },
   modalBtn: { flex: 1, borderRadius: 12 },

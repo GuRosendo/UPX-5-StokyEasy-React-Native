@@ -1,7 +1,6 @@
 import {
   View,
   Modal,
-  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +8,7 @@ import {
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { formatCurrency } from "../shared/helpers";
+import { Input } from "../../../components/general/Input";
 import { styles } from "./clients.styles";
 
 export function AddInstallmentModal({ visible, value, setValue, onSave, onClose, colors }) {
@@ -29,11 +29,11 @@ export function AddInstallmentModal({ visible, value, setValue, onSave, onClose,
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.label, { color: colors.text }]}>Valor da parcela *</Text>
-          <TextInput
-            style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+          <Input
+            label="Valor da parcela *"
+            icon="money-bill-wave"
             placeholder="0,00"
-            placeholderTextColor={colors.text + "66"}
+            background={colors.background}
             keyboardType="numeric"
             value={value}
             onChangeText={(v) => setValue(formatCurrency(v))}

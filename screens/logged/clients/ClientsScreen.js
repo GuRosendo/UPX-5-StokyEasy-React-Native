@@ -18,11 +18,13 @@ export default function ClientsScreen() {
   const {
     clients, allClients, userProducts,
     expandedClientId, expandedOrderId,
-    totalClients, totalActiveOrders, totalPending,
+    totalClients, totalActiveOrders, totalPending, totalCompleted,
     searchQuery, setSearchQuery, searchVisible, toggleSearch,
+    showCompleted, setShowCompleted,
     clientModal, editingClient, clientForm, setClientForm,
     openCreateClient, openEditClient, closeClientModal, handleSaveClient, handleDeleteClient,
     orderModal, orderItems, pickerOpenIndex, setPickerOpenIndex,
+    orderFirstDueDate, setOrderFirstDueDate,
     openCreateOrder, closeOrderModal, addOrderItem, removeOrderItem, updateOrderItem, handleSaveOrder,
     editOrderModal, editingOrder, editingClientId, editingClientObj,
     openEditOrder, closeEditOrderModal, handleSaveEditedOrder,
@@ -30,6 +32,7 @@ export default function ClientsScreen() {
     selectedOrderId, openAddInstallment, handleAddInstallment, setAddInstallmentModal,
     handlePayInstallment, handleUnpayInstallment,
     handleCancelOrder, handleDeleteOrder,
+    handleCompleteOrder,
     handleRecoverOrder, handleDeleteCancelledOrder,
     toggleClient, toggleOrder,
   } = useClients();
@@ -59,7 +62,43 @@ export default function ClientsScreen() {
           </Text>
           <Text style={[styles.summaryLabel, { color: colors.text }]}>A receber</Text>
         </View>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+          <FontAwesome6 name="circle-check" size={18} color="#27ae60" />
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{totalCompleted}</Text>
+          <Text style={[styles.summaryLabel, { color: colors.text }]}>Finalizados</Text>
+        </View>
       </View>
+
+      {/* Filtro de pedidos finalizados */}
+      <TouchableOpacity
+        onPress={() => setShowCompleted((v) => !v)}
+        style={[
+          styles.filterToggle,
+          {
+            backgroundColor: showCompleted ? "#27ae6022" : colors.card,
+            borderColor:      showCompleted ? "#27ae60"   : colors.text + "22",
+          },
+        ]}
+        activeOpacity={0.8}
+      >
+        <View style={[
+          styles.checkbox,
+          {
+            backgroundColor: showCompleted ? "#27ae60" : "transparent",
+            borderColor:      showCompleted ? "#27ae60" : colors.text + "55",
+          },
+        ]}>
+          {showCompleted && <FontAwesome6 name="check" size={10} color="#fff" />}
+        </View>
+        <Text style={[styles.filterToggleText, { color: showCompleted ? "#27ae60" : colors.text }]}>
+          Exibir apenas pedidos finalizados
+        </Text>
+        {totalCompleted > 0 && (
+          <View style={[styles.filterBadge, { backgroundColor: "#27ae60" }]}>
+            <Text style={styles.filterBadgeText}>{totalCompleted}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       {/* Barra de busca */}
       {searchVisible && (
@@ -86,9 +125,18 @@ export default function ClientsScreen() {
 
   const ListEmpty = (
     <View style={styles.emptyContainer}>
-      <FontAwesome6 name="user-slash" size={48} color={colors.mediumRed} style={{ opacity: 0.4 }} />
+      <FontAwesome6
+        name={showCompleted ? "circle-check" : "user-slash"}
+        size={48}
+        color={showCompleted ? "#27ae60" : colors.mediumRed}
+        style={{ opacity: 0.4 }}
+      />
       <Text style={[styles.empty, { color: colors.text }]}>
-        {searchQuery ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
+        {showCompleted
+          ? "Nenhum pedido finalizado ainda."
+          : searchQuery
+          ? "Nenhum cliente encontrado."
+          : "Nenhum cliente cadastrado ainda."}
       </Text>
     </View>
   );
@@ -116,14 +164,16 @@ export default function ClientsScreen() {
             onUnpayInstallment={handleUnpayInstallment}
             onEditOrder={openEditOrder}
             onCancelOrder={handleCancelOrder}
+            onCompleteOrder={handleCompleteOrder}
             onRecoverOrder={handleRecoverOrder}
             onDeleteCancelledOrder={handleDeleteCancelledOrder}
+            showCompleted={showCompleted}
             colors={colors}
           />
         )}
       />
 
-      {/* FABs — lupa + adicionar cliente */}
+      {/* FABs — lupa + adicionar cliente (ocultar no modo finalizado) */}
       <View style={styles.fabRow}>
         <TouchableOpacity
           style={[
@@ -139,13 +189,15 @@ export default function ClientsScreen() {
             color={searchVisible ? "#fff" : colors.mediumRed}
           />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.mediumRed }]}
-          onPress={openCreateClient}
-          activeOpacity={0.85}
-        >
-          <FontAwesome6 name="user-plus" size={20} color="#fff" />
-        </TouchableOpacity>
+        {!showCompleted && (
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: colors.mediumRed }]}
+            onPress={openCreateClient}
+            activeOpacity={0.85}
+          >
+            <FontAwesome6 name="user-plus" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Modal cliente */}
@@ -166,6 +218,8 @@ export default function ClientsScreen() {
         orderItems={orderItems}
         pickerOpenIndex={pickerOpenIndex}
         setPickerOpenIndex={setPickerOpenIndex}
+        firstDueDate={orderFirstDueDate}
+        setFirstDueDate={setOrderFirstDueDate}
         onAddItem={addOrderItem}
         onRemoveItem={removeOrderItem}
         onUpdateItem={updateOrderItem}

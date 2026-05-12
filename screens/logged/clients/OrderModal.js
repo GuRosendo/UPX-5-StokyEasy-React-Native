@@ -2,7 +2,6 @@ import {
   View,
   Modal,
   FlatList,
-  ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -11,14 +10,30 @@ import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { Input } from "../../../components/general/Input";
 import { toCurrencyDisplay } from "../shared/helpers";
+import { ProductPickerModal } from "./ProductPickerModal";
 import { styles } from "./clients.styles";
+import { useState } from "react";
+
+function addMonths(ts, n) {
+  const d = new Date(ts);
+  d.setMonth(d.getMonth() + n);
+  return d.getTime();
+}
+
+function tsToDateBR(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toLocaleDateString("pt-BR");
+}
 
 export function OrderModal({
   visible,
   userProducts,
   orderItems,
-  pickerOpenIndex,
+  pickerOpenIndex,      // mantido por compatibilidade mas não mais usado para scroll
   setPickerOpenIndex,
+  firstDueDate,
+  setFirstDueDate,
   onAddItem,
   onRemoveItem,
   onUpdateItem,
@@ -26,15 +41,22 @@ export function OrderModal({
   onClose,
   colors,
 }) {
+  // Controla qual índice de item está com o ProductPickerModal aberto
+  const [productModalIndex, setProductModalIndex] = useState(null);
+
   const availableProducts = userProducts.filter((p) => p.quantity > 0);
+
+  const handleProductSelect = (index, productId) => {
+    onUpdateItem(index, "productId", productId);
+    setProductModalIndex(null);
+  };
 
   const renderOrderItem = ({ item, index }) => {
     const selectedProduct = userProducts.find((p) => p.productId === item.productId);
-    const qty        = parseInt(item.quantity, 10) || 0;
-    const inst       = parseInt(item.installments, 10) || 1;
-    const total      = selectedProduct ? selectedProduct.price * qty : 0;
-    const overStock  = selectedProduct && qty > selectedProduct.quantity;
-    const isPickerOpen = pickerOpenIndex === index;
+    const qty       = parseInt(item.quantity, 10) || 0;
+    const inst      = parseInt(item.installments, 10) || 1;
+    const total     = selectedProduct ? selectedProduct.price * qty : 0;
+    const overStock = selectedProduct && qty > selectedProduct.quantity;
 
     return (
       <View
@@ -55,66 +77,29 @@ export function OrderModal({
           )}
         </View>
 
-        {/* Seletor de produto */}
+        {/* ── Seletor de produto — abre modal próprio ── */}
         <Text style={[styles.label, { color: colors.text }]}>Produto *</Text>
         <TouchableOpacity
           style={[
             styles.productSelector,
             { borderColor: colors.mediumRed, backgroundColor: colors.card },
           ]}
-          onPress={() => setPickerOpenIndex(isPickerOpen ? null : index)}
+          onPress={() => setProductModalIndex(index)}
+          activeOpacity={0.75}
         >
-          <Text style={{ color: selectedProduct ? colors.text : colors.text + "66", flex: 1 }}>
+          <Text
+            style={{
+              color: selectedProduct ? colors.text : colors.text + "66",
+              flex: 1,
+              fontSize: 14,
+            }}
+          >
             {selectedProduct ? selectedProduct.name : "Selecione um produto..."}
           </Text>
-          <FontAwesome6
-            name={isPickerOpen ? "chevron-up" : "chevron-down"}
-            size={12}
-            color={colors.text}
-          />
+          <FontAwesome6 name="chevron-right" size={12} color={colors.text} style={{ opacity: 0.5 }} />
         </TouchableOpacity>
 
-        {isPickerOpen && (
-          availableProducts.length === 0 ? (
-            <View style={[styles.productPicker, { borderColor: colors.mediumRed, justifyContent: "center" }]}>
-              <Text style={[styles.noStockText, { color: colors.text }]}>
-                ⚠️ Nenhum produto com estoque disponível.
-              </Text>
-            </View>
-          ) : (
-            <ScrollView
-              style={[styles.productPicker, { borderColor: colors.mediumRed }]}
-              nestedScrollEnabled={true}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={true}
-            >
-              {availableProducts.map((p) => {
-                const selected = item.productId === p.productId;
-                return (
-                  <TouchableOpacity
-                    key={p.productId}
-                    style={[
-                      styles.productOption,
-                      { borderColor: selected ? colors.mediumRed : colors.text + "22" },
-                      selected && { backgroundColor: colors.mediumRed + "22" },
-                    ]}
-                    onPress={() => { onUpdateItem(index, "productId", p.productId); setPickerOpenIndex(null); }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.productOptionName, { color: colors.text }]}>{p.name}</Text>
-                      <Text style={[styles.productOptionSub, { color: colors.text }]}>
-                        Estoque: {p.quantity} • {toCurrencyDisplay(p.price)} cada
-                      </Text>
-                    </View>
-                    {selected && <FontAwesome6 name="circle-check" size={18} color={colors.mediumRed} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )
-        )}
-
-        {/* Quantidade + Parcelas usando Input customizado */}
+        {/* Quantidade + Parcelas */}
         <View style={styles.row}>
           <View style={{ flex: 1, marginRight: 8 }}>
             <Input
@@ -175,6 +160,61 @@ export function OrderModal({
         </Text>
       </TouchableOpacity>
 
+      {/* ── Data da 1ª parcela ── */}
+      <View
+        style={[
+          styles.dueDateSection,
+          { borderColor: colors.mediumRed + "33", backgroundColor: colors.background, marginBottom: 4 },
+        ]}
+      >
+        <Text
+          style={[styles.sectionLabel, { color: colors.text, marginTop: 0, marginBottom: 8 }]}
+        >
+          Datas de vencimento
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Data da 1ª parcela (opcional)"
+              icon="calendar-days"
+              placeholder="Selecione a data"
+              isDate={true}
+              useTodayAsMin={false}
+              useTodayAsDefaultValue={!firstDueDate}
+              initialDate={
+                firstDueDate
+                  ? new Date(firstDueDate).toISOString().split("T")[0]
+                  : undefined
+              }
+              value={firstDueDate ? tsToDateBR(firstDueDate) : ""}
+              setDateSelected={(dateObj) => {
+                const ts =
+                  dateObj instanceof Date
+                    ? dateObj.getTime()
+                    : new Date(dateObj).getTime();
+                setFirstDueDate(ts);
+              }}
+            />
+          </View>
+          {firstDueDate ? (
+            <TouchableOpacity
+              onPress={() => setFirstDueDate(null)}
+              style={{ marginTop: 28 }}
+            >
+              <FontAwesome6
+                name="xmark"
+                size={16}
+                color={colors.text}
+                style={{ opacity: 0.4 }}
+              />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <Text style={[styles.hintText, { color: colors.text }]}>
+          As demais parcelas serão geradas mensalmente a partir desta data.
+        </Text>
+      </View>
+
       <View style={styles.modalButtons}>
         <Button
           mode="outlined"
@@ -197,33 +237,48 @@ export function OrderModal({
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
-      >
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+    <>
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        >
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Novo Pedido</Text>
-            <TouchableOpacity onPress={onClose}>
-              <FontAwesome6 name="xmark" size={20} color={colors.text} />
-            </TouchableOpacity>
+          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Novo Pedido</Text>
+              <TouchableOpacity onPress={onClose}>
+                <FontAwesome6 name="xmark" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={orderItems}
+              keyExtractor={(_, index) => String(index)}
+              renderItem={renderOrderItem}
+              ListFooterComponent={ListFooter}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            />
           </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
-          <FlatList
-            data={orderItems}
-            keyExtractor={(_, index) => String(index)}
-            renderItem={renderOrderItem}
-            ListFooterComponent={ListFooter}
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled={true}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      {/* Modal de seleção de produto — fora do FlatList, sem scroll aninhado */}
+      <ProductPickerModal
+        visible={productModalIndex !== null}
+        products={availableProducts}
+        selectedId={
+          productModalIndex !== null
+            ? orderItems[productModalIndex]?.productId
+            : null
+        }
+        onSelect={(productId) => handleProductSelect(productModalIndex, productId)}
+        onClose={() => setProductModalIndex(null)}
+        colors={colors}
+      />
+    </>
   );
 }

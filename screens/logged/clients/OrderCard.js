@@ -18,11 +18,13 @@ export function OrderCard({
   onUnpayInstallment,
   onEditOrder,
   onCancelOrder,
+  onCompleteOrder,
   colors,
 }) {
   const paidCount  = order.installments.filter((i) => i.paid).length;
   const totalCount = order.installments.length;
   const pending    = order.installments.filter((i) => !i.paid).reduce((a, i) => a + i.value, 0);
+  const allPaid    = totalCount > 0 && paidCount === totalCount;
 
   const renderInstallment = ({ item: inst }) => {
     const dateStr = tsToDateStr(inst.dueDate);
@@ -112,6 +114,18 @@ export function OrderCard({
               Cancelar
             </Button>
           </View>
+
+          {allPaid && (
+            <Button
+              mode="contained"
+              icon="check-circle"
+              style={{ borderRadius: 10, marginTop: 8, backgroundColor: "#27ae60" }}
+              labelStyle={{ color: "#fff", fontSize: 12 }}
+              onPress={() => onCompleteOrder(clientId, order.orderId)}
+            >
+              Finalizar pedido
+            </Button>
+          )}
         </View>
       )}
     </View>

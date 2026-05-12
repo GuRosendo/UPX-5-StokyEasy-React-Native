@@ -1,7 +1,6 @@
 import {
   View,
   Modal,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -11,6 +10,7 @@ import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { formatCurrency } from "../shared/helpers";
 import { PRODUCT_CATEGORIES } from "./useProducts";
+import { Input } from "../../../components/general/Input";
 import { styles } from "./products.styles";
 
 export function ProductModal({ visible, editingProduct, form, setForm, onSave, onClose, colors }) {
@@ -23,7 +23,7 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
       >
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+        <View style={[styles.modalBox, { backgroundColor: colors.background }]}>
           {/* Cabeçalho */}
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -40,11 +40,11 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
             bounces={false}
           >
             {/* Nome */}
-            <Text style={[styles.label, { color: colors.text }]}>Nome *</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+            <Input
+              label="Nome *"
+              icon="box"
               placeholder="Ex: Camiseta Básica"
-              placeholderTextColor={colors.text + "66"}
+              background={colors.card}
               value={form.name}
               onChangeText={(v) => setForm({ ...form, name: v })}
               returnKeyType="next"
@@ -88,24 +88,24 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
             {/* Quantidade + Valor */}
             <View style={styles.row}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={[styles.label, { color: colors.text }]}>Quantidade *</Text>
-                <TextInput
-                  style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+                <Input
+                  label="Quantidade *"
+                  icon="cubes"
                   placeholder="0"
-                  placeholderTextColor={colors.text + "66"}
                   keyboardType="numeric"
+                  background={colors.card}
                   value={form.quantity}
                   onChangeText={(v) => setForm({ ...form, quantity: v.replace(/\D/g, "") })}
                   returnKeyType="next"
                 />
               </View>
               <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={[styles.label, { color: colors.text }]}>Valor (R$) *</Text>
-                <TextInput
-                  style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+                <Input
+                  label="Valor (R$) *"
+                  icon="money-bill-wave"
                   placeholder="0,00"
-                  placeholderTextColor={colors.text + "66"}
                   keyboardType="numeric"
+                  background={colors.card}
                   value={form.price}
                   onChangeText={(v) => setForm({ ...form, price: formatCurrency(v) })}
                   returnKeyType="next"
@@ -114,16 +114,14 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
             </View>
 
             {/* Descrição */}
-            <Text style={[styles.label, { color: colors.text }]}>Descrição</Text>
-            <TextInput
-              style={[styles.input, styles.textArea, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+            <Input
+              label="Descrição"
+              icon="align-left"
               placeholder="Detalhes adicionais do produto..."
-              placeholderTextColor={colors.text + "66"}
+              background={colors.card}
               value={form.description}
               onChangeText={(v) => setForm({ ...form, description: v })}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
+              multiline={true}
               returnKeyType="done"
             />
 

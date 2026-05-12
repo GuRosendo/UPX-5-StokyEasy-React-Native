@@ -1,7 +1,8 @@
-import { View, Modal, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput } from "react-native";
+import { View, Modal, TouchableOpacity, KeyboardAvoidingView, Platform } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { formatPhone } from "../shared/helpers";
+import { Input } from "../../../components/general/Input";
 import { styles } from "./clients.styles";
 
 export function ClientModal({ visible, editingClient, form, setForm, onSave, onClose, colors }) {
@@ -14,7 +15,7 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
       >
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+        <View style={[styles.modalBox, { backgroundColor: colors.background }]}>
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingClient ? "Editar Cliente" : "Novo Cliente"}
@@ -25,22 +26,22 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
           </View>
 
           {/* Nome */}
-          <Text style={[styles.label, { color: colors.text }]}>Nome *</Text>
-          <TextInput
-            style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+          <Input
+            label="Nome *"
+            icon="user"
             placeholder="Ex: João Silva"
-            placeholderTextColor={colors.text + "66"}
+            background={colors.background}
             value={form.name}
             onChangeText={(v) => setForm({ ...form, name: v })}
             returnKeyType="next"
           />
 
           {/* Email */}
-          <Text style={[styles.label, { color: colors.text }]}>Email</Text>
-          <TextInput
-            style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+          <Input
+            label="Email"
+            icon="envelope"
             placeholder="cliente@email.com"
-            placeholderTextColor={colors.text + "66"}
+            background={colors.background}
             keyboardType="email-address"
             autoCapitalize="none"
             value={form.email}
@@ -49,11 +50,11 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
           />
 
           {/* Telefone */}
-          <Text style={[styles.label, { color: colors.text }]}>Telefone</Text>
-          <TextInput
-            style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
+          <Input
+            label="Telefone"
+            icon="phone"
             placeholder="(00) 00000-0000"
-            placeholderTextColor={colors.text + "66"}
+            background={colors.background}
             keyboardType="phone-pad"
             value={form.phone}
             onChangeText={(v) => setForm({ ...form, phone: formatPhone(v) })}

@@ -1,6 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { FontAwesome6 } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import InitialPage from "../../screens/logged/InitialPage";
 
@@ -16,6 +17,7 @@ const Tab = createBottomTabNavigator();
 export const BottomTabsLayout = () => {
     const { theme, themeColors } = useTheme();
     const colors = themeColors[theme];
+    const insets = useSafeAreaInsets();
 
     return (
         <Tab.Navigator
@@ -24,8 +26,8 @@ export const BottomTabsLayout = () => {
                 tabBarStyle: {
                     backgroundColor: colors.background,
                     borderTopWidth: 0,
-                    paddingBottom: 5,
-                    height: 60,
+                    paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+                    height: 60 + (insets.bottom > 0 ? insets.bottom : 0),
                 },
                 tabBarActiveTintColor: colors.mediumRed,
                 tabBarInactiveTintColor: colors.text,
