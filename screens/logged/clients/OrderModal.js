@@ -1,14 +1,15 @@
 import {
   View,
   Modal,
-  TextInput,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
+import { Input } from "../../../components/general/Input";
 import { toCurrencyDisplay } from "../shared/helpers";
 import { styles } from "./clients.styles";
 
@@ -29,10 +30,10 @@ export function OrderModal({
 
   const renderOrderItem = ({ item, index }) => {
     const selectedProduct = userProducts.find((p) => p.productId === item.productId);
-    const qty = parseInt(item.quantity, 10) || 0;
-    const inst = parseInt(item.installments, 10) || 1;
-    const total = selectedProduct ? selectedProduct.price * qty : 0;
-    const overStock = selectedProduct && qty > selectedProduct.quantity;
+    const qty        = parseInt(item.quantity, 10) || 0;
+    const inst       = parseInt(item.installments, 10) || 1;
+    const total      = selectedProduct ? selectedProduct.price * qty : 0;
+    const overStock  = selectedProduct && qty > selectedProduct.quantity;
     const isPickerOpen = pickerOpenIndex === index;
 
     return (
@@ -73,18 +74,20 @@ export function OrderModal({
           />
         </TouchableOpacity>
 
-        {/* Produtos como View+map para não aninhar VirtualizedLists */}
         {isPickerOpen && (
           availableProducts.length === 0 ? (
-            <View
-              style={[styles.productPicker, { borderColor: colors.mediumRed, justifyContent: "center" }]}
-            >
+            <View style={[styles.productPicker, { borderColor: colors.mediumRed, justifyContent: "center" }]}>
               <Text style={[styles.noStockText, { color: colors.text }]}>
                 ⚠️ Nenhum produto com estoque disponível.
               </Text>
             </View>
           ) : (
-            <View style={[styles.productPicker, { borderColor: colors.mediumRed }]}>
+            <ScrollView
+              style={[styles.productPicker, { borderColor: colors.mediumRed }]}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
+            >
               {availableProducts.map((p) => {
                 const selected = item.productId === p.productId;
                 return (
@@ -95,37 +98,29 @@ export function OrderModal({
                       { borderColor: selected ? colors.mediumRed : colors.text + "22" },
                       selected && { backgroundColor: colors.mediumRed + "22" },
                     ]}
-                    onPress={() => {
-                      onUpdateItem(index, "productId", p.productId);
-                      setPickerOpenIndex(null);
-                    }}
+                    onPress={() => { onUpdateItem(index, "productId", p.productId); setPickerOpenIndex(null); }}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.productOptionName, { color: colors.text }]}>
-                        {p.name}
-                      </Text>
+                      <Text style={[styles.productOptionName, { color: colors.text }]}>{p.name}</Text>
                       <Text style={[styles.productOptionSub, { color: colors.text }]}>
                         Estoque: {p.quantity} • {toCurrencyDisplay(p.price)} cada
                       </Text>
                     </View>
-                    {selected && (
-                      <FontAwesome6 name="circle-check" size={18} color={colors.mediumRed} />
-                    )}
+                    {selected && <FontAwesome6 name="circle-check" size={18} color={colors.mediumRed} />}
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
           )
         )}
 
-        {/* Quantidade + Parcelas */}
+        {/* Quantidade + Parcelas usando Input customizado */}
         <View style={styles.row}>
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={[styles.label, { color: colors.text }]}>Quantidade *</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.card }]}
+            <Input
+              label="Quantidade *"
+              icon="cubes"
               placeholder="1"
-              placeholderTextColor={colors.text + "66"}
               keyboardType="numeric"
               value={item.quantity}
               onChangeText={(v) => onUpdateItem(index, "quantity", v.replace(/\D/g, ""))}
@@ -133,11 +128,10 @@ export function OrderModal({
             />
           </View>
           <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={[styles.label, { color: colors.text }]}>Parcelas *</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.card }]}
+            <Input
+              label="Parcelas *"
+              icon="layer-group"
               placeholder="1"
-              placeholderTextColor={colors.text + "66"}
               keyboardType="numeric"
               value={item.installments}
               onChangeText={(v) => onUpdateItem(index, "installments", v.replace(/\D/g, ""))}
@@ -148,9 +142,7 @@ export function OrderModal({
 
         {/* Preview */}
         {selectedProduct && item.quantity && item.installments ? (
-          <View
-            style={[styles.previewBox, { backgroundColor: overStock ? "#fdecea" : colors.card }]}
-          >
+          <View style={[styles.previewBox, { backgroundColor: overStock ? "#fdecea" : colors.card }]}>
             <FontAwesome6
               name={overStock ? "triangle-exclamation" : "circle-info"}
               size={14}
@@ -221,13 +213,13 @@ export function OrderModal({
             </TouchableOpacity>
           </View>
 
-          {/* FlatList única — elimina ScrollView aninhado */}
           <FlatList
             data={orderItems}
             keyExtractor={(_, index) => String(index)}
             renderItem={renderOrderItem}
             ListFooterComponent={ListFooter}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
             showsVerticalScrollIndicator={false}
           />
         </View>

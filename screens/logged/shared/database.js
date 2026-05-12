@@ -1,10 +1,13 @@
 import * as SQLite from "expo-sqlite";
 
+// ─── Abrir banco ─────────────────────────────────────────────────────────────
 const db = SQLite.openDatabaseSync("app.db");
 
+// ─── Inicializar tabelas ──────────────────────────────────────────────────────
 export function initDatabase() {
   db.execSync(`
     PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
 
     CREATE TABLE IF NOT EXISTS products (
       productId   TEXT PRIMARY KEY,
@@ -47,10 +50,20 @@ export function initDatabase() {
       value         REAL NOT NULL DEFAULT 0,
       paid          INTEGER NOT NULL DEFAULT 0,
       paidAt        INTEGER,
+      dueDate       INTEGER,
       FOREIGN KEY (orderId) REFERENCES orders(orderId) ON DELETE CASCADE
     );
   `);
+
+  // Migração segura: adicionar dueDate se veio de versão anterior sem ela
+  try {
+    db.execSync("ALTER TABLE installments ADD COLUMN dueDate INTEGER;");
+  } catch (_) {
+    // coluna já existe — ignorar
+  }
 }
+
+// ─── PRODUTOS ─────────────────────────────────────────────────────────────────
 
 export function getProducts(userId) {
   return db.getAllSync(
@@ -59,42 +72,41 @@ export function getProducts(userId) {
   );
 }
 
+export function getProductById(productId) {
+  return db.getFirstSync("SELECT * FROM products WHERE productId = ?", [productId]);
+}
+
 export function upsertProduct(product) {
   db.runSync(
     `INSERT INTO products (productId, userId, name, quantity, price, description, category, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(productId) DO UPDATE SET
-       name = excluded.name,
-       quantity = excluded.quantity,
-       price = excluded.price,
+       name        = excluded.name,
+       quantity    = excluded.quantity,
+       price       = excluded.price,
        description = excluded.description,
-       category = excluded.category,
-       updatedAt = excluded.updatedAt`,
+       category    = excluded.category,
+       updatedAt   = excluded.updatedAt`,
     [
-      product.productId,
-      product.userId,
-      product.name,
-      product.quantity,
-      product.price,
-      product.description ?? "",
-      product.category ?? "Outros",
-      product.createdAt,
-      product.updatedAt,
+      product.productId, product.userId, product.name,
+      product.quantity,  product.price,  product.description ?? "",
+      product.category ?? "Outros",      product.createdAt,  product.updatedAt,
     ]
   );
 }
 
 export function updateProductQuantity(productId, quantity) {
-  db.runSync("UPDATE products SET quantity = ?, updatedAt = ? WHERE productId = ?", [
-    quantity,
-    Date.now(),
-    productId,
-  ]);
+  db.runSync(
+    "UPDATE products SET quantity = ?, updatedAt = ? WHERE productId = ?",
+    [quantity, Date.now(), productId]
+  );
 }
 
 export function deleteProduct(productId) {
   db.runSync("DELETE FROM products WHERE productId = ?", [productId]);
 }
+
+// ─── CLIENTES ─────────────────────────────────────────────────────────────────
 
 export function getClients(userId) {
   const clients = db.getAllSync(
@@ -107,7 +119,6 @@ export function getClients(userId) {
       "SELECT * FROM orders WHERE clientId = ? ORDER BY createdAt DESC",
       [client.clientId]
     );
-
     const ordersWithInstallments = orders.map((order) => {
       const installments = db.getAllSync(
         "SELECT * FROM installments WHERE orderId = ? ORDER BY idx ASC",
@@ -122,7 +133,6 @@ export function getClients(userId) {
         })),
       };
     });
-
     return { ...client, orders: ordersWithInstallments };
   });
 }
@@ -132,17 +142,11 @@ export function upsertClient(client) {
     `INSERT INTO clients (clientId, userId, name, email, phone, createdAt)
      VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(clientId) DO UPDATE SET
-       name = excluded.name,
+       name  = excluded.name,
        email = excluded.email,
        phone = excluded.phone`,
-    [
-      client.clientId,
-      client.userId,
-      client.name,
-      client.email ?? "",
-      client.phone ?? "",
-      client.createdAt,
-    ]
+    [client.clientId, client.userId, client.name,
+     client.email ?? "", client.phone ?? "", client.createdAt]
   );
 }
 
@@ -150,30 +154,34 @@ export function deleteClient(clientId) {
   db.runSync("DELETE FROM clients WHERE clientId = ?", [clientId]);
 }
 
+// ─── PEDIDOS ──────────────────────────────────────────────────────────────────
+
 export function insertOrder(order) {
   db.runSync(
     `INSERT INTO orders (orderId, clientId, userId, totalValue, quantity, status, productRef, productId, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      order.orderId,
-      order.clientId,
-      order.userId,
-      order.totalValue,
-      order.quantity,
-      order.status ?? "active",
-      order.productRef ?? "",
-      order.productId ?? "",
+      order.orderId,    order.clientId,   order.userId,
+      order.totalValue, order.quantity,   order.status ?? "active",
+      order.productRef ?? "",             order.productId ?? "",
       order.createdAt,
     ]
   );
-
   for (const inst of order.installments) {
     db.runSync(
-      `INSERT INTO installments (installmentId, orderId, idx, value, paid, paidAt)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [inst.installmentId, order.orderId, inst.index, inst.value, 0, null]
+      `INSERT INTO installments (installmentId, orderId, idx, value, paid, paidAt, dueDate)
+       VALUES (?, ?, ?, ?, 0, NULL, ?)`,
+      [inst.installmentId, order.orderId, inst.index, inst.value, inst.dueDate ?? null]
     );
   }
+}
+
+// Atualiza produto, quantidade e valor total do pedido numa única chamada
+export function updateOrderCore(orderId, { totalValue, quantity, productRef, productId }) {
+  db.runSync(
+    "UPDATE orders SET totalValue = ?, quantity = ?, productRef = ?, productId = ? WHERE orderId = ?",
+    [totalValue, quantity, productRef, productId, orderId]
+  );
 }
 
 export function updateOrderStatus(orderId, status) {
@@ -184,6 +192,12 @@ export function updateOrderTotalValue(orderId, totalValue) {
   db.runSync("UPDATE orders SET totalValue = ? WHERE orderId = ?", [totalValue, orderId]);
 }
 
+export function deleteOrder(orderId) {
+  db.runSync("DELETE FROM orders WHERE orderId = ?", [orderId]);
+}
+
+// ─── PARCELAS ─────────────────────────────────────────────────────────────────
+
 export function setInstallmentPaid(installmentId, paid) {
   db.runSync(
     "UPDATE installments SET paid = ?, paidAt = ? WHERE installmentId = ?",
@@ -193,13 +207,44 @@ export function setInstallmentPaid(installmentId, paid) {
 
 export function insertInstallment(installment) {
   db.runSync(
-    `INSERT INTO installments (installmentId, orderId, idx, value, paid, paidAt)
-     VALUES (?, ?, ?, ?, 0, NULL)`,
+    `INSERT INTO installments (installmentId, orderId, idx, value, paid, paidAt, dueDate)
+     VALUES (?, ?, ?, ?, 0, NULL, ?)`,
     [
-      installment.installmentId,
-      installment.orderId,
-      installment.index,
-      installment.value,
+      installment.installmentId, installment.orderId,
+      installment.index,         installment.value,
+      installment.dueDate ?? null,
     ]
   );
+}
+
+export function updateInstallmentValue(installmentId, value) {
+  db.runSync(
+    "UPDATE installments SET value = ? WHERE installmentId = ?",
+    [value, installmentId]
+  );
+}
+
+export function updateInstallmentDueDate(installmentId, dueDate) {
+  db.runSync(
+    "UPDATE installments SET dueDate = ? WHERE installmentId = ?",
+    [dueDate, installmentId]
+  );
+}
+
+export function deleteInstallment(installmentId) {
+  db.runSync("DELETE FROM installments WHERE installmentId = ?", [installmentId]);
+}
+
+// Reindexar parcelas após remoção — mantém idx contínuo (1, 2, 3 …)
+export function reindexInstallments(orderId) {
+  const rows = db.getAllSync(
+    "SELECT installmentId FROM installments WHERE orderId = ? ORDER BY idx ASC",
+    [orderId]
+  );
+  rows.forEach((row, i) => {
+    db.runSync(
+      "UPDATE installments SET idx = ? WHERE installmentId = ?",
+      [i + 1, row.installmentId]
+    );
+  });
 }

@@ -13,7 +13,8 @@ import {
 const EMPTY_FORM = { name: "", quantity: "", price: "", description: "", category: "Outros" };
 
 export const PRODUCT_CATEGORIES = [
-  "Alimentos",
+  "Joias e Acessórios", 
+  "Alimentos", 
   "Bebidas",
   "Perecíveis",
   "Higiene & Limpeza",

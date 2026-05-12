@@ -7,6 +7,7 @@ import { useClients } from "./useClients";
 import { ClientCard } from "./ClientCard";
 import { ClientModal } from "./ClientModal";
 import { OrderModal } from "./OrderModal";
+import { EditOrderModal } from "./EditOrderModal";
 import { AddInstallmentModal } from "./AddInstallmentModal";
 import { styles } from "./clients.styles";
 
@@ -15,49 +16,22 @@ export default function ClientsScreen() {
   const colors = themeColors[theme];
 
   const {
-    clients,
-    allClients,
-    userProducts,
-    expandedClientId,
-    expandedOrderId,
-    totalClients,
-    totalActiveOrders,
-    totalPending,
-    searchQuery,
-    setSearchQuery,
-    searchVisible,
-    toggleSearch,
-    clientModal,
-    editingClient,
-    clientForm,
-    setClientForm,
-    openCreateClient,
-    openEditClient,
-    closeClientModal,
-    handleSaveClient,
-    handleDeleteClient,
-    orderModal,
-    orderItems,
-    pickerOpenIndex,
-    setPickerOpenIndex,
-    openCreateOrder,
-    closeOrderModal,
-    addOrderItem,
-    removeOrderItem,
-    updateOrderItem,
-    handleSaveOrder,
-    addInstallmentModal,
-    addInstallmentValue,
-    setAddInstallmentValue,
-    selectedOrderId,
-    openAddInstallment,
-    handleAddInstallment,
-    setAddInstallmentModal,
-    handlePayInstallment,
-    handleUnpayInstallment,
-    handleCancelOrder,
-    toggleClient,
-    toggleOrder,
+    clients, allClients, userProducts,
+    expandedClientId, expandedOrderId,
+    totalClients, totalActiveOrders, totalPending,
+    searchQuery, setSearchQuery, searchVisible, toggleSearch,
+    clientModal, editingClient, clientForm, setClientForm,
+    openCreateClient, openEditClient, closeClientModal, handleSaveClient, handleDeleteClient,
+    orderModal, orderItems, pickerOpenIndex, setPickerOpenIndex,
+    openCreateOrder, closeOrderModal, addOrderItem, removeOrderItem, updateOrderItem, handleSaveOrder,
+    editOrderModal, editingOrder, editingClientId, editingClientObj,
+    openEditOrder, closeEditOrderModal, handleSaveEditedOrder,
+    addInstallmentModal, addInstallmentValue, setAddInstallmentValue,
+    selectedOrderId, openAddInstallment, handleAddInstallment, setAddInstallmentModal,
+    handlePayInstallment, handleUnpayInstallment,
+    handleCancelOrder, handleDeleteOrder,
+    handleRecoverOrder, handleDeleteCancelledOrder,
+    toggleClient, toggleOrder,
   } = useClients();
 
   const ListHeader = (
@@ -140,14 +114,16 @@ export default function ClientsScreen() {
             onDeleteClient={handleDeleteClient}
             onPayInstallment={handlePayInstallment}
             onUnpayInstallment={handleUnpayInstallment}
-            onAddInstallment={openAddInstallment}
+            onEditOrder={openEditOrder}
             onCancelOrder={handleCancelOrder}
+            onRecoverOrder={handleRecoverOrder}
+            onDeleteCancelledOrder={handleDeleteCancelledOrder}
             colors={colors}
           />
         )}
       />
 
-      {/* FABs */}
+      {/* FABs — lupa + adicionar cliente */}
       <View style={styles.fabRow}>
         <TouchableOpacity
           style={[
@@ -163,7 +139,6 @@ export default function ClientsScreen() {
             color={searchVisible ? "#fff" : colors.mediumRed}
           />
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: colors.mediumRed }]}
           onPress={openCreateClient}
@@ -173,7 +148,7 @@ export default function ClientsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal de cliente */}
+      {/* Modal cliente */}
       <ClientModal
         visible={clientModal}
         editingClient={editingClient}
@@ -184,7 +159,7 @@ export default function ClientsScreen() {
         colors={colors}
       />
 
-      {/* Modal de pedido */}
+      {/* Modal novo pedido */}
       <OrderModal
         visible={orderModal}
         userProducts={userProducts}
@@ -199,7 +174,21 @@ export default function ClientsScreen() {
         colors={colors}
       />
 
-      {/* Modal de parcela */}
+      {/* Modal editar pedido */}
+      <EditOrderModal
+        visible={editOrderModal}
+        order={editingOrder}
+        clientId={editingClientId}
+        client={editingClientObj}
+        userProducts={userProducts}
+        onClose={closeEditOrderModal}
+        onSave={handleSaveEditedOrder}
+        onCancelOrder={handleCancelOrder}
+        onDeleteOrder={handleDeleteOrder}
+        colors={colors}
+      />
+
+      {/* Modal parcela */}
       <AddInstallmentModal
         visible={addInstallmentModal}
         value={addInstallmentValue}

@@ -44,7 +44,7 @@ export const handleRequestLogin = async(credentials) => {
 
     //validate password
     if(!credentials.password || credentials.password.length < 8){
-        handleMessage(false, "Ocorreu um erro", "Senha incorreta");
+        handleMessage(false, "Ocorreu um erro", "Senha incorreta, a senha deve possuir 8 caracteres");
         return false;
     }
 

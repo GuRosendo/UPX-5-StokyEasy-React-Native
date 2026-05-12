@@ -9,42 +9,53 @@ import {
   upsertClient,
   deleteClient,
   getProducts,
-  upsertProduct,
   updateProductQuantity,
   insertOrder,
+  updateOrderCore,
   updateOrderStatus,
   updateOrderTotalValue,
+  deleteOrder,
   setInstallmentPaid,
   insertInstallment,
+  updateInstallmentValue,
+  updateInstallmentDueDate,
+  deleteInstallment,
+  reindexInstallments,
 } from "../shared/database";
 
-const EMPTY_CLIENT = { name: "", email: "", phone: "" };
+const EMPTY_CLIENT     = { name: "", email: "", phone: "" };
 const EMPTY_ORDER_ITEM = { productId: "", quantity: "", installments: "" };
 
 export function useClients() {
-  const [clients, setClients] = useState([]);
-  const [userProducts, setUserProducts] = useState([]);
+  const [clients,       setClients]       = useState([]);
+  const [userProducts,  setUserProducts]  = useState([]);
   const [expandedClientId, setExpandedClientId] = useState(null);
-  const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [expandedOrderId,  setExpandedOrderId]  = useState(null);
 
-  // Modal de cliente
-  const [clientModal, setClientModal] = useState(false);
+  // Modal cliente
+  const [clientModal,   setClientModal]   = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const [clientForm, setClientForm] = useState(EMPTY_CLIENT);
+  const [clientForm,    setClientForm]    = useState(EMPTY_CLIENT);
 
-  // Modal de pedido
-  const [orderModal, setOrderModal] = useState(false);
+  // Modal novo pedido
+  const [orderModal,       setOrderModal]       = useState(false);
   const [selectedClientId, setSelectedClientId] = useState(null);
-  const [orderItems, setOrderItems] = useState([{ ...EMPTY_ORDER_ITEM }]);
-  const [pickerOpenIndex, setPickerOpenIndex] = useState(null);
+  const [orderItems,       setOrderItems]       = useState([{ ...EMPTY_ORDER_ITEM }]);
+  const [pickerOpenIndex,  setPickerOpenIndex]  = useState(null);
 
-  // Modal de parcela
+  // Modal editar pedido
+  const [editOrderModal,  setEditOrderModal]  = useState(false);
+  const [editingOrder,    setEditingOrder]    = useState(null);
+  const [editingClientId, setEditingClientId] = useState(null);
+  const [editingClientObj,setEditingClientObj]= useState(null); // cliente completo para WhatsApp
+
+  // Modal parcela
   const [addInstallmentModal, setAddInstallmentModal] = useState(false);
   const [addInstallmentValue, setAddInstallmentValue] = useState("");
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [selectedOrderId,     setSelectedOrderId]     = useState(null);
 
   // Busca
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery,   setSearchQuery]   = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
 
   // ── Carregar ────────────────────────────────────────────────────────────────
@@ -60,12 +71,8 @@ export function useClients() {
     const loggedUser = await AsyncStorage.getItem("userData");
     if (!loggedUser) return;
     const user = JSON.parse(loggedUser);
-
-    const clientsList = getClients(user.id);
-    setClients(clientsList.sort((a, b) => b.createdAt - a.createdAt));
-
-    const productsList = getProducts(user.id);
-    setUserProducts(productsList);
+    setClients(getClients(user.id).sort((a, b) => b.createdAt - a.createdAt));
+    setUserProducts(getProducts(user.id));
   };
 
   // ── CRUD Clientes ───────────────────────────────────────────────────────────
@@ -93,29 +100,27 @@ export function useClients() {
       Alert.alert("Campo obrigatório", "Informe o nome do cliente.");
       return;
     }
-
     const loggedUser = await AsyncStorage.getItem("userData");
     if (!loggedUser) return;
     const user = JSON.parse(loggedUser);
-
-    const now = Date.now();
-    const client = editingClient
-      ? {
-          ...editingClient,
-          name: clientForm.name.trim(),
-          email: clientForm.email.trim(),
-          phone: clientForm.phone,
-        }
-      : {
-          clientId: `cli_${now}_${Math.random().toString(36).slice(2)}`,
-          userId: user.id,
-          name: clientForm.name.trim(),
-          email: clientForm.email.trim(),
-          phone: clientForm.phone,
-          createdAt: now,
-        };
-
-    upsertClient(client);
+    const now  = Date.now();
+    upsertClient(
+      editingClient
+        ? {
+            ...editingClient,
+            name:  clientForm.name.trim(),
+            email: clientForm.email.trim(),
+            phone: clientForm.phone,
+          }
+        : {
+            clientId:  `cli_${now}_${Math.random().toString(36).slice(2)}`,
+            userId:    user.id,
+            name:      clientForm.name.trim(),
+            email:     clientForm.email.trim(),
+            phone:     clientForm.phone,
+            createdAt: now,
+          }
+    );
     closeClientModal();
     loadData();
   };
@@ -129,16 +134,13 @@ export function useClients() {
         {
           text: "Excluir",
           style: "destructive",
-          onPress: () => {
-            deleteClient(client.clientId);
-            loadData();
-          },
+          onPress: () => { deleteClient(client.clientId); loadData(); },
         },
       ]
     );
   };
 
-  // ── Pedidos ────────────────────────────────────────────────────────────────
+  // ── Novo pedido ─────────────────────────────────────────────────────────────
 
   const openCreateOrder = (clientId) => {
     setSelectedClientId(clientId);
@@ -155,102 +157,229 @@ export function useClients() {
     setPickerOpenIndex(null);
   };
 
-  const addOrderItem = () => {
-    setOrderItems((prev) => [...prev, { ...EMPTY_ORDER_ITEM }]);
-    setPickerOpenIndex(null);
-  };
-
-  const removeOrderItem = (index) => {
-    setOrderItems((prev) => prev.filter((_, i) => i !== index));
-    setPickerOpenIndex(null);
-  };
-
-  const updateOrderItem = (index, field, value) => {
+  const addOrderItem    = () => { setOrderItems((p) => [...p, { ...EMPTY_ORDER_ITEM }]); setPickerOpenIndex(null); };
+  const removeOrderItem = (i) => { setOrderItems((p) => p.filter((_, j) => j !== i));   setPickerOpenIndex(null); };
+  const updateOrderItem = (index, field, value) =>
     setOrderItems((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
+      const u = [...prev];
+      u[index] = { ...u[index], [field]: value };
+      return u;
     });
-  };
 
   const handleSaveOrder = async () => {
     for (let i = 0; i < orderItems.length; i++) {
       const item = orderItems[i];
-      const qty = parseInt(item.quantity, 10);
+      const qty  = parseInt(item.quantity, 10);
       const inst = parseInt(item.installments, 10);
-
-      if (!item.productId) {
-        Alert.alert("Produto obrigatório", `Selecione um produto no item ${i + 1}.`);
-        return;
-      }
-      if (!qty || qty <= 0) {
-        Alert.alert("Campo inválido", `Informe uma quantidade válida no item ${i + 1}.`);
-        return;
-      }
-      if (!inst || inst <= 0) {
-        Alert.alert("Campo inválido", `Informe o número de parcelas no item ${i + 1}.`);
-        return;
-      }
+      if (!item.productId) { Alert.alert("Produto obrigatório", `Selecione um produto no item ${i + 1}.`); return; }
+      if (!qty || qty <= 0) { Alert.alert("Campo inválido", `Quantidade inválida no item ${i + 1}.`); return; }
+      if (!inst || inst <= 0) { Alert.alert("Campo inválido", `Nº de parcelas inválido no item ${i + 1}.`); return; }
     }
 
     const loggedUser = await AsyncStorage.getItem("userData");
     if (!loggedUser) return;
-    const user = JSON.parse(loggedUser);
-
+    const user     = JSON.parse(loggedUser);
     const products = getProducts(user.id);
 
     for (let i = 0; i < orderItems.length; i++) {
-      const item = orderItems[i];
-      const qty = parseInt(item.quantity, 10);
-      const product = products.find((p) => p.productId === item.productId);
-      if (!product) {
-        Alert.alert("Erro", `Produto do item ${i + 1} não encontrado.`);
-        return;
-      }
-      if (product.quantity < qty) {
-        Alert.alert(
-          "Estoque insuficiente",
-          `Item ${i + 1}: disponível ${product.quantity} un. de "${product.name}".`
-        );
+      const { productId, quantity } = orderItems[i];
+      const qty  = parseInt(quantity, 10);
+      const prod = products.find((p) => p.productId === productId);
+      if (!prod) { Alert.alert("Erro", `Produto do item ${i + 1} não encontrado.`); return; }
+      if (prod.quantity < qty) {
+        Alert.alert("Estoque insuficiente", `Item ${i + 1}: disponível ${prod.quantity} un. de "${prod.name}".`);
         return;
       }
     }
 
     const now = Date.now();
-
     for (let i = 0; i < orderItems.length; i++) {
       const item = orderItems[i];
-      const qty = parseInt(item.quantity, 10);
+      const qty  = parseInt(item.quantity, 10);
       const inst = parseInt(item.installments, 10);
-      const product = products.find((p) => p.productId === item.productId);
-      const total = product.price * qty;
-      const installmentValue = total / inst;
+      const prod = products.find((p) => p.productId === item.productId);
+      const total = prod.price * qty;
 
-      // Deduzir estoque
-      updateProductQuantity(product.productId, product.quantity - qty);
-
-      const order = {
-        orderId: `ord_${now}_${i}_${Math.random().toString(36).slice(2)}`,
-        clientId: selectedClientId,
-        userId: user.id,
+      updateProductQuantity(prod.productId, prod.quantity - qty);
+      insertOrder({
+        orderId:    `ord_${now}_${i}_${Math.random().toString(36).slice(2)}`,
+        clientId:   selectedClientId,
+        userId:     user.id,
         totalValue: total,
-        quantity: qty,
-        status: "active",
-        productRef: product.name,
-        productId: product.productId,
-        createdAt: now,
+        quantity:   qty,
+        status:     "active",
+        productRef: prod.name,
+        productId:  prod.productId,
+        createdAt:  now,
         installments: Array.from({ length: inst }, (_, j) => ({
           installmentId: `inst_${now}_${i}_${j}`,
-          index: j + 1,
-          value: installmentValue,
+          index:   j + 1,
+          value:   total / inst,
+          dueDate: null,
         })),
-      };
-
-      insertOrder(order);
+      });
     }
-
     closeOrderModal();
     loadData();
+  };
+
+  // ── Editar pedido ───────────────────────────────────────────────────────────
+
+  const openEditOrder = (clientId, order) => {
+    const clientObj = clients.find((c) => c.clientId === clientId) ?? null;
+    setEditingClientId(clientId);
+    setEditingClientObj(clientObj);
+    setEditingOrder(order);
+    setEditOrderModal(true);
+  };
+
+  const closeEditOrderModal = () => {
+    setEditOrderModal(false);
+    setEditingOrder(null);
+    setEditingClientId(null);
+    setEditingClientObj(null);
+  };
+
+  const handleSaveEditedOrder = (updatedOrder, stockDeltas) => {
+    // Ajustar estoque
+    for (const { productId, delta } of stockDeltas) {
+      const prod = userProducts.find((p) => p.productId === productId);
+      if (prod) updateProductQuantity(productId, prod.quantity + delta);
+    }
+
+    // Atualizar cabeçalho
+    updateOrderCore(updatedOrder.orderId, {
+      totalValue: updatedOrder.totalValue,
+      quantity:   updatedOrder.quantity,
+      productRef: updatedOrder.productRef,
+      productId:  updatedOrder.productId,
+    });
+
+    // Sincronizar parcelas
+    const originalIds = new Set((editingOrder?.installments || []).map((i) => i.installmentId));
+    const updatedIds  = new Set(updatedOrder.installments.map((i) => i.installmentId));
+
+    // Deletar removidas
+    for (const id of originalIds) {
+      if (!updatedIds.has(id)) deleteInstallment(id);
+    }
+
+    // Atualizar/inserir
+    for (const inst of updatedOrder.installments) {
+      if (originalIds.has(inst.installmentId)) {
+        updateInstallmentDueDate(inst.installmentId, inst.dueDate ?? null);
+        if (!inst.paid) updateInstallmentValue(inst.installmentId, inst.value);
+      } else {
+        insertInstallment({
+          installmentId: inst.installmentId,
+          orderId:       updatedOrder.orderId,
+          index:         inst.index,
+          value:         inst.value,
+          dueDate:       inst.dueDate ?? null,
+        });
+      }
+    }
+
+    reindexInstallments(updatedOrder.orderId);
+    closeEditOrderModal();
+    loadData();
+  };
+
+  // ── Cancelar / excluir / recuperar pedido ───────────────────────────────────
+
+  const handleCancelOrder = (clientId, orderId) => {
+    Alert.alert("Cancelar pedido", "O estoque será devolvido. Deseja continuar?", [
+      { text: "Voltar", style: "cancel" },
+      {
+        text: "Cancelar pedido",
+        style: "destructive",
+        onPress: () => {
+          const client = clients.find((c) => c.clientId === clientId);
+          const order  = client?.orders?.find((o) => o.orderId === orderId);
+          if (order?.productId && order?.quantity) {
+            const prod = userProducts.find((p) => p.productId === order.productId);
+            if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
+          }
+          updateOrderStatus(orderId, "cancelled");
+          closeEditOrderModal();
+          loadData();
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteOrder = (clientId, orderId) => {
+    Alert.alert("Excluir pedido", "Esta ação é irreversível. O estoque será devolvido.", [
+      { text: "Voltar", style: "cancel" },
+      {
+        text: "Excluir definitivamente",
+        style: "destructive",
+        onPress: () => {
+          const client = clients.find((c) => c.clientId === clientId);
+          const order  = client?.orders?.find((o) => o.orderId === orderId);
+          if (order?.productId && order?.quantity) {
+            const prod = userProducts.find((p) => p.productId === order.productId);
+            if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
+          }
+          deleteOrder(orderId);
+          closeEditOrderModal();
+          loadData();
+        },
+      },
+    ]);
+  };
+
+  /**
+   * Recuperar pedido cancelado → volta para "active" e deduz estoque novamente.
+   */
+  const handleRecoverOrder = (clientId, orderId) => {
+    Alert.alert(
+      "Recuperar pedido",
+      "O pedido voltará como ativo e o estoque será deduzido novamente.",
+      [
+        { text: "Voltar", style: "cancel" },
+        {
+          text: "Recuperar",
+          onPress: () => {
+            const client = clients.find((c) => c.clientId === clientId);
+            const order  = client?.orders?.find((o) => o.orderId === orderId);
+            if (order?.productId && order?.quantity) {
+              const prod = userProducts.find((p) => p.productId === order.productId);
+              if (prod) {
+                if (prod.quantity < order.quantity) {
+                  Alert.alert(
+                    "Estoque insuficiente",
+                    `Disponível: ${prod.quantity} un. de "${prod.name}". Ajuste o estoque antes de recuperar.`
+                  );
+                  return;
+                }
+                updateProductQuantity(prod.productId, prod.quantity - order.quantity);
+              }
+            }
+            updateOrderStatus(orderId, "active");
+            loadData();
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Excluir pedido cancelado do histórico (sem mexer em estoque — já foi devolvido no cancelamento).
+   */
+  const handleDeleteCancelledOrder = (clientId, orderId) => {
+    Alert.alert(
+      "Excluir do histórico",
+      "Remover este pedido cancelado permanentemente?",
+      [
+        { text: "Voltar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: () => { deleteOrder(orderId); loadData(); },
+        },
+      ]
+    );
   };
 
   // ── Parcelas ────────────────────────────────────────────────────────────────
@@ -261,21 +390,14 @@ export function useClients() {
   };
 
   const handleUnpayInstallment = (clientId, orderId, installmentId) => {
-    Alert.alert(
-      "Cancelar pagamento",
-      "Deseja marcar esta parcela como não paga?",
-      [
-        { text: "Voltar", style: "cancel" },
-        {
-          text: "Confirmar",
-          style: "destructive",
-          onPress: () => {
-            setInstallmentPaid(installmentId, false);
-            loadData();
-          },
-        },
-      ]
-    );
+    Alert.alert("Cancelar pagamento", "Marcar esta parcela como não paga?", [
+      { text: "Voltar", style: "cancel" },
+      {
+        text: "Confirmar",
+        style: "destructive",
+        onPress: () => { setInstallmentPaid(installmentId, false); loadData(); },
+      },
+    ]);
   };
 
   const openAddInstallment = (orderId) => {
@@ -286,74 +408,32 @@ export function useClients() {
 
   const handleAddInstallment = (clientId) => {
     const value = parseCurrency(addInstallmentValue);
-    if (!value || value <= 0) {
-      Alert.alert("Valor inválido", "Informe um valor válido para a parcela.");
-      return;
-    }
-
-    // Buscar pedido para saber o índice atual
+    if (!value || value <= 0) { Alert.alert("Valor inválido", "Informe um valor válido para a parcela."); return; }
     const client = clients.find((c) => c.clientId === clientId);
-    const order = client?.orders?.find((o) => o.orderId === selectedOrderId);
+    const order  = client?.orders?.find((o) => o.orderId === selectedOrderId);
     if (!order) return;
-
-    const newIndex = order.installments.length + 1;
-
     insertInstallment({
       installmentId: `inst_${Date.now()}`,
-      orderId: selectedOrderId,
-      index: newIndex,
+      orderId:       selectedOrderId,
+      index:         order.installments.length + 1,
       value,
+      dueDate:       null,
     });
-
     updateOrderTotalValue(selectedOrderId, order.totalValue + value);
-
     setAddInstallmentModal(false);
     setSelectedOrderId(null);
     loadData();
   };
 
-  const handleCancelOrder = (clientId, orderId) => {
-    Alert.alert("Cancelar pedido", "Tem certeza? O estoque será devolvido.", [
-      { text: "Voltar", style: "cancel" },
-      {
-        text: "Cancelar pedido",
-        style: "destructive",
-        onPress: async () => {
-          const client = clients.find((c) => c.clientId === clientId);
-          const order = client?.orders?.find((o) => o.orderId === orderId);
-
-          if (order && order.productId && order.quantity) {
-            const loggedUser = await AsyncStorage.getItem("userData");
-            if (loggedUser) {
-              const user = JSON.parse(loggedUser);
-              const products = getProducts(user.id);
-              const product = products.find((p) => p.productId === order.productId);
-              if (product) {
-                updateProductQuantity(product.productId, product.quantity + order.quantity);
-              }
-            }
-          }
-
-          updateOrderStatus(orderId, "cancelled");
-          loadData();
-        },
-      },
-    ]);
-  };
-
   // ── Expand ──────────────────────────────────────────────────────────────────
 
-  const toggleClient = (id) => setExpandedClientId((prev) => (prev === id ? null : id));
-  const toggleOrder = (id) => setExpandedOrderId((prev) => (prev === id ? null : id));
+  const toggleClient = (id) => setExpandedClientId((p) => (p === id ? null : id));
+  const toggleOrder  = (id) => setExpandedOrderId((p)  => (p === id ? null : id));
 
   // ── Busca ────────────────────────────────────────────────────────────────────
 
-  const toggleSearch = () => {
-    setSearchVisible((v) => {
-      if (v) setSearchQuery("");
-      return !v;
-    });
-  };
+  const toggleSearch = () =>
+    setSearchVisible((v) => { if (v) setSearchQuery(""); return !v; });
 
   const filteredClients = searchQuery.trim()
     ? clients.filter(
@@ -366,10 +446,9 @@ export function useClients() {
 
   // ── Derivados ───────────────────────────────────────────────────────────────
 
-  const totalClients = clients.length;
+  const totalClients      = clients.length;
   const totalActiveOrders = clients.reduce(
-    (acc, c) => acc + (c.orders || []).filter((o) => o.status === "active").length,
-    0
+    (acc, c) => acc + (c.orders || []).filter((o) => o.status === "active").length, 0
   );
   const totalPending = clients.reduce(
     (acc, c) =>
@@ -377,8 +456,7 @@ export function useClients() {
       (c.orders || [])
         .filter((o) => o.status === "active")
         .reduce(
-          (s, o) =>
-            s + o.installments.filter((i) => !i.paid).reduce((a, i) => a + i.value, 0),
+          (s, o) => s + o.installments.filter((i) => !i.paid).reduce((a, i) => a + i.value, 0),
           0
         ),
     0
@@ -393,44 +471,24 @@ export function useClients() {
     totalClients,
     totalActiveOrders,
     totalPending,
-    searchQuery,
-    setSearchQuery,
-    searchVisible,
-    toggleSearch,
+    searchQuery, setSearchQuery,
+    searchVisible, toggleSearch,
     // modal cliente
-    clientModal,
-    editingClient,
-    clientForm,
-    setClientForm,
-    openCreateClient,
-    openEditClient,
-    closeClientModal,
-    handleSaveClient,
-    handleDeleteClient,
-    // modal pedido
-    orderModal,
-    orderItems,
-    pickerOpenIndex,
-    setPickerOpenIndex,
-    openCreateOrder,
-    closeOrderModal,
-    addOrderItem,
-    removeOrderItem,
-    updateOrderItem,
-    handleSaveOrder,
+    clientModal, editingClient, clientForm, setClientForm,
+    openCreateClient, openEditClient, closeClientModal, handleSaveClient, handleDeleteClient,
+    // modal novo pedido
+    orderModal, orderItems, pickerOpenIndex, setPickerOpenIndex,
+    openCreateOrder, closeOrderModal, addOrderItem, removeOrderItem, updateOrderItem, handleSaveOrder,
+    // modal editar pedido
+    editOrderModal, editingOrder, editingClientId, editingClientObj,
+    openEditOrder, closeEditOrderModal, handleSaveEditedOrder,
     // modal parcela
-    addInstallmentModal,
-    addInstallmentValue,
-    setAddInstallmentValue,
-    selectedOrderId,
-    openAddInstallment,
-    handleAddInstallment,
-    setAddInstallmentModal,
+    addInstallmentModal, addInstallmentValue, setAddInstallmentValue,
+    selectedOrderId, openAddInstallment, handleAddInstallment, setAddInstallmentModal,
     // ações
-    handlePayInstallment,
-    handleUnpayInstallment,
-    handleCancelOrder,
-    toggleClient,
-    toggleOrder,
+    handlePayInstallment, handleUnpayInstallment,
+    handleCancelOrder, handleDeleteOrder,
+    handleRecoverOrder, handleDeleteCancelledOrder,
+    toggleClient, toggleOrder,
   };
 }

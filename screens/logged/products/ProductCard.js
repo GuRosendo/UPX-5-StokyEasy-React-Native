@@ -5,27 +5,30 @@ import { styles } from "./products.styles";
 
 export function ProductCard({ product, isExpanded, onToggle, onEdit, onDelete, colors }) {
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={() => onToggle(product.productId)}>
+    <View>
       <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
-        <Card.Title
-          title={product.name}
-          subtitle={`Qtd: ${product.quantity}  •  R$ ${product.price.toFixed(2).replace(".", ",")}`}
-          titleStyle={{ fontSize: 17, fontWeight: "600", color: colors.text }}
-          subtitleStyle={{ opacity: 0.7, color: colors.text }}
-          left={() => (
-            <View style={[styles.iconContainer, { backgroundColor: colors.mediumRedOpaque }]}>
-              <FontAwesome6 name="box" size={18} color={colors.mediumRed} />
-            </View>
-          )}
-          right={() => (
-            <FontAwesome6
-              name={isExpanded ? "chevron-up" : "chevron-down"}
-              size={14}
-              color={colors.text}
-              style={{ marginRight: 16, opacity: 0.5 }}
-            />
-          )}
-        />
+        {/* Apenas o header é clicável para expandir/colapsar */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onToggle(product.productId)}>
+          <Card.Title
+            title={product.name}
+            subtitle={`Qtd: ${product.quantity}  •  R$ ${product.price.toFixed(2).replace(".", ",")}`}
+            titleStyle={{ fontSize: 17, fontWeight: "600", color: colors.text }}
+            subtitleStyle={{ opacity: 0.7, color: colors.text }}
+            left={() => (
+              <View style={[styles.iconContainer, { backgroundColor: colors.mediumRedOpaque }]}>
+                <FontAwesome6 name="box" size={18} color={colors.mediumRed} />
+              </View>
+            )}
+            right={() => (
+              <FontAwesome6
+                name={isExpanded ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={colors.text}
+                style={{ marginRight: 16, opacity: 0.5 }}
+              />
+            )}
+          />
+        </TouchableOpacity>
 
         {isExpanded && (
           <Card.Content style={styles.expandedContent}>
@@ -74,6 +77,6 @@ export function ProductCard({ product, isExpanded, onToggle, onEdit, onDelete, c
           </Card.Content>
         )}
       </Card>
-    </TouchableOpacity>
+    </View>
   );
 }

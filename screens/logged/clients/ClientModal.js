@@ -1,11 +1,4 @@
-import {
-  View,
-  Modal,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { View, Modal, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { formatPhone } from "../shared/helpers";
@@ -31,6 +24,7 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
             </TouchableOpacity>
           </View>
 
+          {/* Nome */}
           <Text style={[styles.label, { color: colors.text }]}>Nome *</Text>
           <TextInput
             style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
@@ -41,6 +35,7 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
             returnKeyType="next"
           />
 
+          {/* Email */}
           <Text style={[styles.label, { color: colors.text }]}>Email</Text>
           <TextInput
             style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}
@@ -53,6 +48,7 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
             returnKeyType="next"
           />
 
+          {/* Telefone */}
           <Text style={[styles.label, { color: colors.text }]}>Telefone</Text>
           <TextInput
             style={[styles.input, { borderColor: colors.mediumRed, color: colors.text, backgroundColor: colors.background }]}

@@ -15,17 +15,20 @@ export function ClientCard({
   onDeleteClient,
   onPayInstallment,
   onUnpayInstallment,
-  onAddInstallment,
+  onEditOrder,
   onCancelOrder,
+  onRecoverOrder,
+  onDeleteCancelledOrder,
   colors,
 }) {
-  const activeOrders = (client.orders || []).filter((o) => o.status === "active");
+  const activeOrders    = (client.orders || []).filter((o) => o.status === "active");
   const cancelledOrders = (client.orders || []).filter((o) => o.status === "cancelled");
 
   return (
     <View>
-      <TouchableOpacity activeOpacity={0.85} onPress={() => onToggleClient(client.clientId)}>
-        <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
+      <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
+        {/* Apenas o header é clicável para expandir/colapsar */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => onToggleClient(client.clientId)}>
           <Card.Title
             title={client.name}
             subtitle={`${activeOrders.length} pedido(s) ativo(s)`}
@@ -45,10 +48,11 @@ export function ClientCard({
               />
             )}
           />
+        </TouchableOpacity>
 
           {isExpanded && (
             <Card.Content style={styles.expandedContent}>
-              {/* Dados de contato */}
+              {/* Contato */}
               {client.email ? (
                 <Text style={[styles.infoText, { color: colors.text }]}>
                   <FontAwesome6 name="envelope" size={13} color={colors.mediumRed} /> {client.email}
@@ -107,7 +111,7 @@ export function ClientCard({
                     onToggle={onToggleOrder}
                     onPayInstallment={onPayInstallment}
                     onUnpayInstallment={onUnpayInstallment}
-                    onAddInstallment={onAddInstallment}
+                    onEditOrder={onEditOrder}
                     onCancelOrder={onCancelOrder}
                     colors={colors}
                   />
@@ -120,32 +124,53 @@ export function ClientCard({
                   <Text style={[styles.sectionLabel, { color: colors.text, opacity: 0.5 }]}>
                     Cancelados
                   </Text>
-                  <FlatList
-                    data={cancelledOrders}
-                    keyExtractor={(order) => order.orderId}
-                    scrollEnabled={false}
-                    renderItem={({ item: order }) => (
-                      <View
-                        style={[
-                          styles.orderCard,
-                          { backgroundColor: colors.background, opacity: 0.5 },
-                        ]}
-                      >
-                        <Text style={[styles.orderTitle, { color: colors.text }]}>
+                  {cancelledOrders.map((order) => (
+                    <View
+                      key={order.orderId}
+                      style={[
+                        styles.cancelledOrderCard,
+                        { backgroundColor: colors.background, borderColor: colors.text + "18" },
+                      ]}
+                    >
+                      {/* Info do pedido cancelado */}
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.orderTitle, { color: colors.text, opacity: 0.55 }]}>
                           {order.productRef || "Pedido"}
                         </Text>
-                        <Text style={[styles.orderSubtitle, { color: colors.text }]}>
-                          Cancelado ✕
+                        <Text style={[styles.orderSubtitle, { color: colors.text, opacity: 0.45 }]}>
+                          Cancelado ✕  •  Qtd: {order.quantity}
                         </Text>
                       </View>
-                    )}
-                  />
+
+                      {/* Ações: Recuperar + Excluir */}
+                      <View style={styles.cancelledActions}>
+                        <TouchableOpacity
+                          style={[styles.cancelledActionBtn, { borderColor: "#27ae60" }]}
+                          onPress={() => onRecoverOrder(client.clientId, order.orderId)}
+                        >
+                          <FontAwesome6 name="rotate-left" size={12} color="#27ae60" />
+                          <Text style={[styles.cancelledActionText, { color: "#27ae60" }]}>
+                            Recuperar
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.cancelledActionBtn, { borderColor: "#c0392b" }]}
+                          onPress={() => onDeleteCancelledOrder(client.clientId, order.orderId)}
+                        >
+                          <FontAwesome6 name="trash" size={12} color="#c0392b" />
+                          <Text style={[styles.cancelledActionText, { color: "#c0392b" }]}>
+                            Excluir
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
                 </>
               )}
             </Card.Content>
           )}
         </Card>
-      </TouchableOpacity>
     </View>
   );
 }

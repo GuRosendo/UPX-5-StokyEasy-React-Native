@@ -38,6 +38,7 @@ export const DateTimePickerCustom = ({
     useTodayAsMin,
     useTodayAsMax,
     useTodayAsDefaultValue,
+    initialDate,   // <-- novo: string ISO "YYYY-MM-DD" ou timestamp (number) para pré-popular
     ...props
 }) => {
     const { theme, themeColors } = useTheme();
@@ -50,20 +51,39 @@ export const DateTimePickerCustom = ({
     const minYear = currentYear - 150;
     const maxYear = currentYear + 150;
 
-    const [date, setDate] = useState(
-        useTodayAsDefaultValue ? todayString : "2000-01-01"
-    );
+    // Resolve a data inicial: initialDate > useTodayAsDefaultValue > fallback
+    const resolveInitialISO = () => {
+        if (initialDate) {
+            if (typeof initialDate === "number") {
+                return new Date(initialDate).toISOString().split("T")[0];
+            }
+            if (typeof initialDate === "string" && initialDate.length >= 10) {
+                return initialDate.slice(0, 10);
+            }
+        }
+        if (useTodayAsDefaultValue) return todayString;
+        return "2000-01-01";
+    };
 
+    const initialISO = resolveInitialISO();
+    const parsedInit = new Date(initialISO + "T00:00:00");
+
+    const [date, setDate] = useState(initialISO);
     const [show, setShow] = useState(false);
     const [yearSelector, setYearSelector] = useState(false);
 
-    const [calendarMonth, setCalendarMonth] = useState(
-        useTodayAsDefaultValue ? todayDate.getMonth() + 1 : 1
-    );
+    const [calendarMonth, setCalendarMonth] = useState(parsedInit.getMonth() + 1);
+    const [calendarYear,  setCalendarYear]  = useState(parsedInit.getFullYear());
 
-    const [calendarYear, setCalendarYear] = useState(
-        useTodayAsDefaultValue ? todayDate.getFullYear() : 2000
-    );
+    // Sincroniza quando initialDate muda (ex: modal reabre com outra parcela)
+    useEffect(() => {
+        const iso = resolveInitialISO();
+        setDate(iso);
+        const d = new Date(iso + "T00:00:00");
+        setCalendarMonth(d.getMonth() + 1);
+        setCalendarYear(d.getFullYear());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialDate]);
 
     const flatListRef = useRef(null);
 
@@ -184,9 +204,16 @@ export const DateTimePickerCustom = ({
 
             <Pressable onPress={toggleDatePicker}>
                 <StyledTextInput
-                    value={date}
-                    editable={false}
                     {...props}
+                    placeholderTextColor={props.placeholderTextColor ?? colors.text + "66"}
+                    value={
+                        props.value && props.value.length > 0
+                            ? props.value
+                            : date && date.length === 10
+                                ? date.split("-").reverse().join("/")
+                                : date
+                    }
+                    editable={false}
                 />
             </Pressable>
         </View>

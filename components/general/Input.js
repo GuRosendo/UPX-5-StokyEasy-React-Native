@@ -15,7 +15,7 @@ import { Dropdown } from './Dropdown';
 
 import { useTheme } from '../ThemeContext';
 
-const Input = forwardRef(({ label, isPassword, icon, rightIcon, isResidenceNumber, hasNumber, setHasNumber, hidePassword, setHidePassword, onFocus, onBlur, isDate, setDateSelected, useTodayAsMin, useTodayAsMax, useTodayAsDefaultValue, isDropdown, canSearch, dropdownHeight, dropdownData, searchInputPlaceholder, arrowAlign, saveType, textShow, scrollEnabled, onSelectText, multiline, ...props }, ref) => {
+const Input = forwardRef(({ label, isPassword, icon, rightIcon, isResidenceNumber, hasNumber, setHasNumber, hidePassword, setHidePassword, onFocus, onBlur, isDate, setDateSelected, useTodayAsMin, useTodayAsMax, useTodayAsDefaultValue, initialDate, isDropdown, canSearch, dropdownHeight, dropdownData, searchInputPlaceholder, arrowAlign, saveType, textShow, scrollEnabled, onSelectText, multiline, ...props }, ref) => {
     const { theme, themeColors } = useTheme();
 
     const colors = themeColors[theme];
@@ -40,6 +40,7 @@ const Input = forwardRef(({ label, isPassword, icon, rightIcon, isResidenceNumbe
                     multiline={multiline}
                     color={colors.text}
                     background={colors.card}
+                    placeholderTextColor={props.placeholderTextColor ?? colors.text + "66"}
                     autoCapitalize={isPassword ? "none" : undefined}
                 />
             }
@@ -63,6 +64,7 @@ const Input = forwardRef(({ label, isPassword, icon, rightIcon, isResidenceNumbe
                     useTodayAsMin={useTodayAsMin}
                     useTodayAsMax={useTodayAsMax}
                     useTodayAsDefaultValue={useTodayAsDefaultValue}
+                    initialDate={initialDate}
                     background={colors.card}
                     color={colors.text}
                 />
