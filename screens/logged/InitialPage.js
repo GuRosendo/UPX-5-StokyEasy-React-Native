@@ -1,25 +1,24 @@
 import React, { useContext, useEffect, useState } from "react";
 import { View, Image, StyleSheet, Switch, TouchableOpacity } from "react-native";
-import { Text } from "react-native-paper";
+import { Text, Button } from "react-native-paper";
 import { useTheme } from "../../components/ThemeContext";
-import { Button } from "react-native-paper";
-import { FontAwesome6 } from '@expo/vector-icons';
+import { FontAwesome6 } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ModalCustom } from "../../components/general/ModalCustom";
-import { LoginDataContext } from '../../components/LoginDataContext';
-
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LoginDataContext } from "../../components/LoginDataContext";
+import { getSession } from "../../functions/shared/secureStorage";
 
 export default function InitialPage({ navigation }) {
     const { theme, themeColors, toggleTheme } = useTheme();
     const colors = themeColors[theme];
+    const insets = useSafeAreaInsets();
 
     const [isEnabled, setIsEnabled] = useState();
     const [isModalVisible, setModalVisible] = useState(false);
+    const [fullName, setFullName] = useState("Usuário");
 
     const { storedData, setStoredData } = useContext(LoginDataContext);
-
-    const [fullName, setFullName] = useState("Usuário");
 
     const toggleSwitch = () => {
         setIsEnabled(!isEnabled);
@@ -35,27 +34,20 @@ export default function InitialPage({ navigation }) {
     }, []);
 
     useEffect(() => {
-        AsyncStorage.getItem("userData").then((data) => {
-            if (data) {
-                let userParsed = JSON.parse(data);
-
-                if (userParsed?.fullName) {
-                    setFullName(userParsed.fullName.split(" ")[0]);
-                }
+        getSession().then((user) => {
+            if (user?.fullName) {
+                setFullName(user.fullName.split(" ")[0]);
             }
         });
     }, []);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={styles.header}>
+            <View style={[styles.header, { top: insets.top + 10 }]}>
                 <Text style={[styles.userName, { color: colors.text }]}>
                     Olá, {fullName}!
                 </Text>
-                <TouchableOpacity
-                    style={styles.logoutButton}
-                    onPress={toggleModal}
-                >
+                <TouchableOpacity style={styles.logoutButton} onPress={toggleModal}>
                     <FontAwesome6
                         name="arrow-right-from-bracket"
                         color={colors.mediumRed}
@@ -65,13 +57,12 @@ export default function InitialPage({ navigation }) {
             </View>
 
             <Image
-                source={""}
+                source={require("../../assets/images/logoStokyEasySmaller.png")}
                 style={styles.avatar}
                 resizeMode="contain"
             />
 
             <View style={styles.titleContainer}>
-                <FontAwesome6 name="boxes-stacked" size={32} color={colors.mediumRed} style={styles.logo} />
                 <Text variant="headlineMedium" style={[styles.title, { color: colors.text }]}>
                     StokyEasy!
                 </Text>
@@ -85,7 +76,7 @@ export default function InitialPage({ navigation }) {
                 mode="contained"
                 style={[styles.button, { backgroundColor: colors.mediumRed }]}
                 onPress={() => navigation.navigate("Produtos")}
-                labelStyle={{ color: '#fff' }}
+                labelStyle={{ color: "#fff" }}
             >
                 Produtos
             </Button>
@@ -143,21 +134,20 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: "center",
         padding: 25,
-        justifyContent: "center"
+        justifyContent: "center",
     },
     header: {
-        position: 'absolute',
-        top: 10,
+        position: "absolute",
         left: 0,
         right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
         paddingHorizontal: 25,
     },
     userName: {
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: "600",
     },
     logoutButton: {
         padding: 8,
@@ -166,16 +156,13 @@ const styles = StyleSheet.create({
     avatar: {
         width: 180,
         height: 180,
-        marginBottom: 15
+        marginBottom: 15,
     },
     titleContainer: {
         flexDirection: "row",
         alignItems: "center",
         marginBottom: 10,
         gap: 10,
-    },
-    logo: {
-        marginBottom: 5,
     },
     title: {
         textAlign: "center",

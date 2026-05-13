@@ -23,7 +23,7 @@ const Input = forwardRef(({ label, isPassword, icon, rightIcon, isResidenceNumbe
     return (
         <View>
             {!isDropdown && (
-                <LeftIcon FontAwesome={true}>
+                <LeftIcon FontAwesome={true} pointerEvents={isDate ? "none" : "auto"}>
                     <FontAwesome6 name={icon} size={25} color={colors.mediumRed} />
                 </LeftIcon>
             )}

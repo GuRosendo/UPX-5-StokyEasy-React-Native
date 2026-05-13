@@ -10,10 +10,12 @@ import { OrderModal } from "./OrderModal";
 import { EditOrderModal } from "./EditOrderModal";
 import { AddInstallmentModal } from "./AddInstallmentModal";
 import { styles } from "./clients.styles";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ClientsScreen() {
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
+  const insets = useSafeAreaInsets();
 
   const {
     clients, allClients, userProducts,
@@ -43,7 +45,6 @@ export default function ClientsScreen() {
         Clientes
       </Text>
 
-      {/* Resumo */}
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
           <FontAwesome6 name="users" size={18} color={colors.mediumRed} />
@@ -142,7 +143,7 @@ export default function ClientsScreen() {
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}> 
       <FlatList
         data={clients}
         keyExtractor={(item) => item.clientId}

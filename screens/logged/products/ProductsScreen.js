@@ -6,10 +6,12 @@ import { useProducts } from "./useProducts";
 import { ProductCard } from "./ProductCard";
 import { ProductModal } from "./ProductModal";
 import { styles } from "./products.styles";
+import { useSafeAreaInsets } from "react-native-safe-area-context"; 
 
 export default function ProductsScreen() {
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
+  const insets = useSafeAreaInsets(); 
 
   const {
     products,
@@ -93,7 +95,7 @@ export default function ProductsScreen() {
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <FlatList
         data={products}
         keyExtractor={(item) => item.productId}

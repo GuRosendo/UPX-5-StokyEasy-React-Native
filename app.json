@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "stokyeasy",
+    "name": "StokyEasy",
     "slug": "stokyeasy",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/logoStokyEasyBigger.png",
     "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/images/logoStokyEasySmaller.png",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
+      "icon": "./assets/images/logoStokyEasyBigger.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Precisamos de acesso à câmera para tirar fotos.",
         "NSPhotoLibraryUsageDescription": "Precisamos de acesso à galeria para selecionar fotos.",
@@ -20,6 +21,11 @@
     },
     "android": {
       "package": "com.stokyeasy.app",
+      "icon": "./assets/images/logoStokyEasyBigger.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logoStokyEasyBigger.png",
+        "backgroundColor": "#ffffff"
+      },
       "permissions": [
         "INTERNET",
         "READ_EXTERNAL_STORAGE",
@@ -61,7 +67,8 @@
       }
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-secure-store"
     ]
   }
 }

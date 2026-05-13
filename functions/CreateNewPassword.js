@@ -1,5 +1,4 @@
 import { handleMessage } from "../components/general/ToastMessage";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 //login
 export const handleCreateNewPassword = (credentials) => {
