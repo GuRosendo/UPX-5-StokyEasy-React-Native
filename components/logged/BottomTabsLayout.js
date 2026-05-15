@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import InitialPage from "../../screens/logged/InitialPage";
 
-import ProfileScreen from "../../screens/logged/ProfileScreen";
+import ProfileScreen from "../../screens/logged/profile/ProfileScreen";
 
 import ClientsScreen from "../../screens/logged/clients/ClientsScreen";
 import ProductsScreen from "../../screens/logged/products/ProductsScreen";
