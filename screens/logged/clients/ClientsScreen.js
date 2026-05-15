@@ -9,6 +9,7 @@ import { ClientModal } from "./ClientModal";
 import { OrderModal } from "./OrderModal";
 import { EditOrderModal } from "./EditOrderModal";
 import { AddInstallmentModal } from "./AddInstallmentModal";
+import { ConfirmModal } from "../../../components/general/ConfirmModal";
 import { styles } from "./clients.styles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -37,6 +38,16 @@ export default function ClientsScreen() {
     handleCompleteOrder,
     handleRecoverOrder, handleDeleteCancelledOrder,
     toggleClient, toggleOrder,
+    // confirmações
+    confirmDeleteClient,    setConfirmDeleteClient,    _doDeleteClient,
+    confirmCancelOrder,     setConfirmCancelOrder,     _doCancelOrder,
+    confirmDeleteOrder,     setConfirmDeleteOrder,     _doDeleteOrder,
+    confirmRecoverOrder,    setConfirmRecoverOrder,    _doRecoverOrder,
+    confirmCompleteOrder,   setConfirmCompleteOrder,   _doCompleteOrder,
+    confirmDeleteCancelled, setConfirmDeleteCancelled, _doDeleteCancelledOrder,
+    confirmPayInstallment,  setConfirmPayInstallment,  _doPayInstallment,
+    confirmUnpayInstallment,setConfirmUnpayInstallment,_doUnpayInstallment,
+    confirmAllPaidComplete, setConfirmAllPaidComplete,
   } = useClients();
 
   const ListHeader = (
@@ -58,9 +69,7 @@ export default function ClientsScreen() {
         </View>
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
           <FontAwesome6 name="clock" size={18} color={colors.mediumRed} />
-          <Text style={[styles.summaryValue, { color: colors.text }]}>
-            {toCurrencyDisplay(totalPending)}
-          </Text>
+          <Text style={[styles.summaryValue, { color: colors.text }]}>{toCurrencyDisplay(totalPending)}</Text>
           <Text style={[styles.summaryLabel, { color: colors.text }]}>A receber</Text>
         </View>
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
@@ -70,7 +79,6 @@ export default function ClientsScreen() {
         </View>
       </View>
 
-      {/* Filtro de pedidos finalizados */}
       <TouchableOpacity
         onPress={() => setShowCompleted((v) => !v)}
         style={[
@@ -101,7 +109,6 @@ export default function ClientsScreen() {
         )}
       </TouchableOpacity>
 
-      {/* Barra de busca */}
       {searchVisible && (
         <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.mediumRed }]}>
           <FontAwesome6 name="magnifying-glass" size={14} color={colors.text} style={{ opacity: 0.5 }} />
@@ -143,7 +150,7 @@ export default function ClientsScreen() {
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}> 
+    <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <FlatList
         data={clients}
         keyExtractor={(item) => item.clientId}
@@ -174,21 +181,13 @@ export default function ClientsScreen() {
         )}
       />
 
-      {/* FABs — lupa + adicionar cliente (ocultar no modo finalizado) */}
       <View style={styles.fabRow}>
         <TouchableOpacity
-          style={[
-            styles.fabSecondary,
-            { backgroundColor: searchVisible ? colors.mediumRed : colors.card },
-          ]}
+          style={[styles.fabSecondary, { backgroundColor: searchVisible ? colors.mediumRed : colors.card }]}
           onPress={toggleSearch}
           activeOpacity={0.85}
         >
-          <FontAwesome6
-            name="magnifying-glass"
-            size={18}
-            color={searchVisible ? "#fff" : colors.mediumRed}
-          />
+          <FontAwesome6 name="magnifying-glass" size={18} color={searchVisible ? "#fff" : colors.mediumRed} />
         </TouchableOpacity>
         {!showCompleted && (
           <TouchableOpacity
@@ -201,7 +200,7 @@ export default function ClientsScreen() {
         )}
       </View>
 
-      {/* Modal cliente */}
+      {/* ── Modais de form ── */}
       <ClientModal
         visible={clientModal}
         editingClient={editingClient}
@@ -211,8 +210,6 @@ export default function ClientsScreen() {
         onClose={closeClientModal}
         colors={colors}
       />
-
-      {/* Modal novo pedido */}
       <OrderModal
         visible={orderModal}
         userProducts={userProducts}
@@ -228,8 +225,6 @@ export default function ClientsScreen() {
         onClose={closeOrderModal}
         colors={colors}
       />
-
-      {/* Modal editar pedido */}
       <EditOrderModal
         visible={editOrderModal}
         order={editingOrder}
@@ -242,20 +237,107 @@ export default function ClientsScreen() {
         onDeleteOrder={handleDeleteOrder}
         colors={colors}
       />
-
-      {/* Modal parcela */}
       <AddInstallmentModal
         visible={addInstallmentModal}
         value={addInstallmentValue}
         setValue={setAddInstallmentValue}
         onSave={() => {
-          const client = clients.find((c) =>
-            c.orders?.some((o) => o.orderId === selectedOrderId)
-          );
+          const client = clients.find((c) => c.orders?.some((o) => o.orderId === selectedOrderId));
           if (client) handleAddInstallment(client.clientId);
         }}
         onClose={() => setAddInstallmentModal(false)}
         colors={colors}
+      />
+
+      {/* ── Modais de confirmação ── */}
+      <ConfirmModal
+        visible={confirmDeleteClient.visible}
+        title="Excluir cliente"
+        message={`Excluir "${confirmDeleteClient.client?.name}" e todos os seus pedidos?`}
+        confirmText="Excluir"
+        isDanger={true}
+        onConfirm={_doDeleteClient}
+        onClose={() => setConfirmDeleteClient({ visible: false, client: null })}
+      />
+      <ConfirmModal
+        visible={confirmCancelOrder.visible}
+        title="Cancelar pedido"
+        message="O estoque será devolvido. Deseja continuar?"
+        confirmText="Cancelar"
+        cancelText="Voltar"
+        isDanger={true}
+        onConfirm={_doCancelOrder}
+        onClose={() => setConfirmCancelOrder({ visible: false, clientId: null, orderId: null })}
+      />
+      <ConfirmModal
+        visible={confirmDeleteOrder.visible}
+        title="Excluir pedido"
+        message="Esta ação é irreversível. O estoque será devolvido."
+        confirmText="Excluir"
+        cancelText="Voltar"
+        isDanger={true}
+        onConfirm={_doDeleteOrder}
+        onClose={() => setConfirmDeleteOrder({ visible: false, clientId: null, orderId: null })}
+      />
+      <ConfirmModal
+        visible={confirmRecoverOrder.visible}
+        title="Recuperar pedido"
+        message="O pedido voltará como ativo e o estoque será deduzido novamente."
+        confirmText="Recuperar"
+        cancelText="Voltar"
+        isDanger={false}
+        onConfirm={_doRecoverOrder}
+        onClose={() => setConfirmRecoverOrder({ visible: false, clientId: null, orderId: null })}
+      />
+      <ConfirmModal
+        visible={confirmCompleteOrder.visible}
+        title="Finalizar pedido"
+        message="Marcar este pedido como finalizado? Ele será movido para o histórico de concluídos."
+        confirmText="Finalizar"
+        cancelText="Voltar"
+        isDanger={false}
+        onConfirm={_doCompleteOrder}
+        onClose={() => setConfirmCompleteOrder({ visible: false, clientId: null, orderId: null })}
+      />
+      <ConfirmModal
+        visible={confirmDeleteCancelled.visible}
+        title="Excluir do histórico"
+        message="Remover este pedido cancelado permanentemente?"
+        confirmText="Excluir"
+        cancelText="Voltar"
+        isDanger={true}
+        onConfirm={_doDeleteCancelledOrder}
+        onClose={() => setConfirmDeleteCancelled({ visible: false, clientId: null, orderId: null })}
+      />
+      <ConfirmModal
+        visible={confirmPayInstallment.visible}
+        title="Confirmar pagamento"
+        message="Marcar esta parcela como paga?"
+        confirmText="Confirmar"
+        isDanger={false}
+        onConfirm={_doPayInstallment}
+        onClose={() => setConfirmPayInstallment({ visible: false, clientId: null, orderId: null, installmentId: null })}
+      />
+      <ConfirmModal
+        visible={confirmUnpayInstallment.visible}
+        title="Cancelar pagamento"
+        message="Marcar esta parcela como não paga?"
+        confirmText="Confirmar"
+        cancelText="Voltar"
+        isDanger={true}
+        onConfirm={_doUnpayInstallment}
+        onClose={() => setConfirmUnpayInstallment({ visible: false, clientId: null, orderId: null, installmentId: null })}
+      />
+      {/* Modal especial: todas as parcelas pagas → oferecer finalizar */}
+      <ConfirmModal
+        visible={confirmAllPaidComplete.visible}
+        title="Pedido concluído!"
+        message="Todas as parcelas foram pagas. Deseja marcar este pedido como finalizado?"
+        confirmText="Finalizar"
+        cancelText="Deixar ativo"
+        isDanger={false}
+        onConfirm={() => _doCompleteOrder()}
+        onClose={() => setConfirmAllPaidComplete({ visible: false, orderId: null })}
       />
     </View>
   );

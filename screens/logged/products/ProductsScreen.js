@@ -5,34 +5,22 @@ import { useTheme } from "../../../components/ThemeContext";
 import { useProducts } from "./useProducts";
 import { ProductCard } from "./ProductCard";
 import { ProductModal } from "./ProductModal";
+import { ConfirmModal } from "../../../components/general/ConfirmModal";
 import { styles } from "./products.styles";
-import { useSafeAreaInsets } from "react-native-safe-area-context"; 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ProductsScreen() {
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
-  const insets = useSafeAreaInsets(); 
+  const insets = useSafeAreaInsets();
 
   const {
-    products,
-    allProducts,
-    modalVisible,
-    editingProduct,
-    form,
-    setForm,
-    expandedId,
-    totalStock,
-    totalValue,
-    searchQuery,
-    setSearchQuery,
-    searchVisible,
-    toggleSearch,
-    openCreateModal,
-    openEditModal,
-    closeModal,
-    handleSave,
-    handleDelete,
-    toggleExpand,
+    products, allProducts,
+    modalVisible, editingProduct, form, setForm,
+    expandedId, totalStock, totalValue,
+    searchQuery, setSearchQuery, searchVisible, toggleSearch,
+    openCreateModal, openEditModal, closeModal, handleSave, handleDelete, toggleExpand,
+    confirmDelete, setConfirmDelete, _doDelete,
   } = useProducts();
 
   const ListHeader = (
@@ -41,7 +29,6 @@ export default function ProductsScreen() {
         Produtos
       </Text>
 
-      {/* Resumo */}
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
           <FontAwesome6 name="boxes-stacked" size={20} color={colors.mediumRed} />
@@ -62,7 +49,6 @@ export default function ProductsScreen() {
         </View>
       </View>
 
-      {/* Barra de busca */}
       {searchVisible && (
         <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.mediumRed }]}>
           <FontAwesome6 name="magnifying-glass" size={14} color={colors.text} style={{ opacity: 0.5 }} />
@@ -115,23 +101,14 @@ export default function ProductsScreen() {
         )}
       />
 
-      {/* FABs */}
       <View style={styles.fabRow}>
         <TouchableOpacity
-          style={[
-            styles.fabSecondary,
-            { backgroundColor: searchVisible ? colors.mediumRed : colors.card },
-          ]}
+          style={[styles.fabSecondary, { backgroundColor: searchVisible ? colors.mediumRed : colors.card }]}
           onPress={toggleSearch}
           activeOpacity={0.85}
         >
-          <FontAwesome6
-            name="magnifying-glass"
-            size={18}
-            color={searchVisible ? "#fff" : colors.mediumRed}
-          />
+          <FontAwesome6 name="magnifying-glass" size={18} color={searchVisible ? "#fff" : colors.mediumRed} />
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: colors.mediumRed }]}
           onPress={openCreateModal}
@@ -141,7 +118,6 @@ export default function ProductsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Modal */}
       <ProductModal
         visible={modalVisible}
         editingProduct={editingProduct}
@@ -150,6 +126,18 @@ export default function ProductsScreen() {
         onSave={handleSave}
         onClose={closeModal}
         colors={colors}
+      />
+
+      {/* Confirmação de exclusão de produto */}
+      <ConfirmModal
+        visible={confirmDelete.visible}
+        title="Excluir produto"
+        message={`Tem certeza que deseja excluir "${confirmDelete.product?.name}"?`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        isDanger={true}
+        onConfirm={_doDelete}
+        onClose={() => setConfirmDelete({ visible: false, product: null })}
       />
     </View>
   );

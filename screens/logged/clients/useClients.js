@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { parseCurrency } from "../shared/helpers";
 import { getSession } from "../../../functions/shared/secureStorage";
+import { handleMessage } from "../../../components/general/ToastMessage";
 import {
     initDatabase,
     getClients,
@@ -68,6 +68,18 @@ export function useClients() {
     // Filtro de pedidos pagos/finalizados
     const [showCompleted, setShowCompleted] = useState(false);
 
+    // ── Modais de confirmação ─────────────────────────────────────────────────
+    // Cada um guarda { visible, clientId?, orderId?, installmentId?, ... }
+    const [confirmDeleteClient,        setConfirmDeleteClient]        = useState({ visible: false, client: null });
+    const [confirmCancelOrder,         setConfirmCancelOrder]         = useState({ visible: false, clientId: null, orderId: null });
+    const [confirmDeleteOrder,         setConfirmDeleteOrder]         = useState({ visible: false, clientId: null, orderId: null });
+    const [confirmRecoverOrder,        setConfirmRecoverOrder]        = useState({ visible: false, clientId: null, orderId: null });
+    const [confirmCompleteOrder,       setConfirmCompleteOrder]       = useState({ visible: false, clientId: null, orderId: null });
+    const [confirmDeleteCancelled,     setConfirmDeleteCancelled]     = useState({ visible: false, clientId: null, orderId: null });
+    const [confirmPayInstallment,      setConfirmPayInstallment]      = useState({ visible: false, clientId: null, orderId: null, installmentId: null });
+    const [confirmUnpayInstallment,    setConfirmUnpayInstallment]    = useState({ visible: false, clientId: null, orderId: null, installmentId: null });
+    const [confirmAllPaidComplete,     setConfirmAllPaidComplete]     = useState({ visible: false, orderId: null });
+
     // ── Carregar ─────────────────────────────────────────────────────────────
 
     useFocusEffect(
@@ -106,7 +118,7 @@ export function useClients() {
 
     const handleSaveClient = async () => {
         if (!clientForm.name.trim()) {
-            Alert.alert("Campo obrigatório", "Informe o nome do cliente.");
+            handleMessage(false, "Campo obrigatório", "Informe o nome do cliente.");
             return;
         }
         const user = await getSession();
@@ -133,19 +145,13 @@ export function useClients() {
         loadData();
     };
 
-    const handleDeleteClient = (client) => {
-        Alert.alert(
-            "Excluir cliente",
-            `Excluir "${client.name}" e todos os seus pedidos?`,
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Excluir",
-                    style: "destructive",
-                    onPress: () => { deleteClient(client.clientId); loadData(); },
-                },
-            ]
-        );
+    // Abre o modal de confirmação — a ação real fica em _doDeleteClient
+    const handleDeleteClient = (client) =>
+        setConfirmDeleteClient({ visible: true, client });
+
+    const _doDeleteClient = () => {
+        deleteClient(confirmDeleteClient.client.clientId);
+        loadData();
     };
 
     // ── Novo pedido ───────────────────────────────────────────────────────────
@@ -181,9 +187,9 @@ export function useClients() {
             const item = orderItems[i];
             const qty  = parseInt(item.quantity, 10);
             const inst = parseInt(item.installments, 10);
-            if (!item.productId) { Alert.alert("Produto obrigatório", `Selecione um produto no item ${i + 1}.`); return; }
-            if (!qty || qty <= 0) { Alert.alert("Campo inválido", `Quantidade inválida no item ${i + 1}.`); return; }
-            if (!inst || inst <= 0) { Alert.alert("Campo inválido", `Nº de parcelas inválido no item ${i + 1}.`); return; }
+            if (!item.productId) { handleMessage(false, "Produto obrigatório", `Selecione um produto no item ${i + 1}.`); return; }
+            if (!qty || qty <= 0) { handleMessage(false, "Campo inválido", `Quantidade inválida no item ${i + 1}.`); return; }
+            if (!inst || inst <= 0) { handleMessage(false, "Campo inválido", `Nº de parcelas inválido no item ${i + 1}.`); return; }
         }
 
         const user = await getSession();
@@ -194,9 +200,9 @@ export function useClients() {
             const { productId, quantity } = orderItems[i];
             const qty  = parseInt(quantity, 10);
             const prod = products.find((p) => p.productId === productId);
-            if (!prod) { Alert.alert("Erro", `Produto do item ${i + 1} não encontrado.`); return; }
+            if (!prod) { handleMessage(false, "Erro", `Produto do item ${i + 1} não encontrado.`); return; }
             if (prod.quantity < qty) {
-                Alert.alert("Estoque insuficiente", `Item ${i + 1}: disponível ${prod.quantity} un. de "${prod.name}".`);
+                handleMessage(false, "Estoque insuficiente", `Item ${i + 1}: disponível ${prod.quantity} un. de "${prod.name}".`);
                 return;
             }
         }
@@ -291,160 +297,111 @@ export function useClients() {
 
     // ── Cancelar / excluir / recuperar pedido ─────────────────────────────────
 
-    const handleCancelOrder = (clientId, orderId) => {
-        Alert.alert("Cancelar pedido", "O estoque será devolvido. Deseja continuar?", [
-            { text: "Voltar", style: "cancel" },
-            {
-                text: "Cancelar pedido",
-                style: "destructive",
-                onPress: () => {
-                    const client = clients.find((c) => c.clientId === clientId);
-                    const order  = client?.orders?.find((o) => o.orderId === orderId);
-                    if (order?.productId && order?.quantity) {
-                        const prod = userProducts.find((p) => p.productId === order.productId);
-                        if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
-                    }
-                    updateOrderStatus(orderId, "cancelled");
-                    closeEditOrderModal();
-                    loadData();
-                },
-            },
-        ]);
+    const handleCancelOrder = (clientId, orderId) =>
+        setConfirmCancelOrder({ visible: true, clientId, orderId });
+
+    const _doCancelOrder = () => {
+        const { clientId, orderId } = confirmCancelOrder;
+        const client = clients.find((c) => c.clientId === clientId);
+        const order  = client?.orders?.find((o) => o.orderId === orderId);
+        if (order?.productId && order?.quantity) {
+            const prod = userProducts.find((p) => p.productId === order.productId);
+            if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
+        }
+        updateOrderStatus(orderId, "cancelled");
+        closeEditOrderModal();
+        loadData();
     };
 
-    const handleDeleteOrder = (clientId, orderId) => {
-        Alert.alert("Excluir pedido", "Esta ação é irreversível. O estoque será devolvido.", [
-            { text: "Voltar", style: "cancel" },
-            {
-                text: "Excluir definitivamente",
-                style: "destructive",
-                onPress: () => {
-                    const client = clients.find((c) => c.clientId === clientId);
-                    const order  = client?.orders?.find((o) => o.orderId === orderId);
-                    if (order?.productId && order?.quantity) {
-                        const prod = userProducts.find((p) => p.productId === order.productId);
-                        if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
-                    }
-                    deleteOrder(orderId);
-                    closeEditOrderModal();
-                    loadData();
-                },
-            },
-        ]);
+    const handleDeleteOrder = (clientId, orderId) =>
+        setConfirmDeleteOrder({ visible: true, clientId, orderId });
+
+    const _doDeleteOrder = () => {
+        const { clientId, orderId } = confirmDeleteOrder;
+        const client = clients.find((c) => c.clientId === clientId);
+        const order  = client?.orders?.find((o) => o.orderId === orderId);
+        if (order?.productId && order?.quantity) {
+            const prod = userProducts.find((p) => p.productId === order.productId);
+            if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
+        }
+        deleteOrder(orderId);
+        closeEditOrderModal();
+        loadData();
     };
 
-    const handleRecoverOrder = (clientId, orderId) => {
-        Alert.alert(
-            "Recuperar pedido",
-            "O pedido voltará como ativo e o estoque será deduzido novamente.",
-            [
-                { text: "Voltar", style: "cancel" },
-                {
-                    text: "Recuperar",
-                    onPress: () => {
-                        const client = clients.find((c) => c.clientId === clientId);
-                        const order  = client?.orders?.find((o) => o.orderId === orderId);
-                        if (order?.productId && order?.quantity) {
-                            const prod = userProducts.find((p) => p.productId === order.productId);
-                            if (prod) {
-                                if (prod.quantity < order.quantity) {
-                                    Alert.alert(
-                                        "Estoque insuficiente",
-                                        `Disponível: ${prod.quantity} un. de "${prod.name}". Ajuste o estoque antes de recuperar.`
-                                    );
-                                    return;
-                                }
-                                updateProductQuantity(prod.productId, prod.quantity - order.quantity);
-                            }
-                        }
-                        updateOrderStatus(orderId, "active");
-                        loadData();
-                    },
-                },
-            ]
-        );
+    const handleRecoverOrder = (clientId, orderId) =>
+        setConfirmRecoverOrder({ visible: true, clientId, orderId });
+
+    const _doRecoverOrder = () => {
+        const { clientId, orderId } = confirmRecoverOrder;
+        const client = clients.find((c) => c.clientId === clientId);
+        const order  = client?.orders?.find((o) => o.orderId === orderId);
+        if (order?.productId && order?.quantity) {
+            const prod = userProducts.find((p) => p.productId === order.productId);
+            if (prod) {
+                if (prod.quantity < order.quantity) {
+                    handleMessage(
+                        false,
+                        "Estoque insuficiente",
+                        `Disponível: ${prod.quantity} un. de "${prod.name}". Ajuste o estoque antes de recuperar.`
+                    );
+                    return;
+                }
+                updateProductQuantity(prod.productId, prod.quantity - order.quantity);
+            }
+        }
+        updateOrderStatus(orderId, "active");
+        loadData();
     };
 
-    const handleCompleteOrder = (clientId, orderId) => {
-        Alert.alert(
-            "Finalizar pedido",
-            "Marcar este pedido como finalizado? Ele será movido para o histórico de concluídos.",
-            [
-                { text: "Voltar", style: "cancel" },
-                {
-                    text: "Finalizar",
-                    onPress: () => { updateOrderStatus(orderId, "completed"); loadData(); },
-                },
-            ]
-        );
+    const handleCompleteOrder = (clientId, orderId) =>
+        setConfirmCompleteOrder({ visible: true, clientId, orderId });
+
+    const _doCompleteOrder = (orderId) => {
+        const id = orderId ?? confirmCompleteOrder.orderId;
+        updateOrderStatus(id, "completed");
+        loadData();
     };
 
-    const handleDeleteCancelledOrder = (clientId, orderId) => {
-        Alert.alert(
-            "Excluir do histórico",
-            "Remover este pedido cancelado permanentemente?",
-            [
-                { text: "Voltar", style: "cancel" },
-                {
-                    text: "Excluir",
-                    style: "destructive",
-                    onPress: () => { deleteOrder(orderId); loadData(); },
-                },
-            ]
-        );
+    const handleDeleteCancelledOrder = (clientId, orderId) =>
+        setConfirmDeleteCancelled({ visible: true, clientId, orderId });
+
+    const _doDeleteCancelledOrder = () => {
+        deleteOrder(confirmDeleteCancelled.orderId);
+        loadData();
     };
 
     // ── Parcelas ──────────────────────────────────────────────────────────────
 
-    const handlePayInstallment = (clientId, orderId, installmentId) => {
-        Alert.alert(
-            "Confirmar pagamento",
-            "Marcar esta parcela como paga?",
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Confirmar",
-                    onPress: () => {
-                        setInstallmentPaid(installmentId, true);
-                        const client = clients.find((c) => c.clientId === clientId);
-                        const order  = client?.orders?.find((o) => o.orderId === orderId);
-                        if (order) {
-                            const allPaid = order.installments.every(
-                                (i) => i.installmentId === installmentId ? true : i.paid
-                            );
-                            if (allPaid && order.installments.length > 0) {
-                                Alert.alert(
-                                    "Pedido concluído!",
-                                    "Todas as parcelas foram pagas. Deseja marcar este pedido como finalizado?",
-                                    [
-                                        { text: "Deixar ativo", style: "cancel", onPress: () => loadData() },
-                                        {
-                                            text: "Finalizar pedido",
-                                            onPress: () => { updateOrderStatus(orderId, "completed"); loadData(); },
-                                        },
-                                    ]
-                                );
-                            } else {
-                                loadData();
-                            }
-                        } else {
-                            loadData();
-                        }
-                    },
-                },
-            ]
-        );
+    const handlePayInstallment = (clientId, orderId, installmentId) =>
+        setConfirmPayInstallment({ visible: true, clientId, orderId, installmentId });
+
+    const _doPayInstallment = () => {
+        const { clientId, orderId, installmentId } = confirmPayInstallment;
+        setInstallmentPaid(installmentId, true);
+        const client = clients.find((c) => c.clientId === clientId);
+        const order  = client?.orders?.find((o) => o.orderId === orderId);
+        if (order) {
+            const allPaid = order.installments.every(
+                (i) => i.installmentId === installmentId ? true : i.paid
+            );
+            if (allPaid && order.installments.length > 0) {
+                loadData();
+                setConfirmAllPaidComplete({ visible: true, orderId });
+            } else {
+                loadData();
+            }
+        } else {
+            loadData();
+        }
     };
 
-    const handleUnpayInstallment = (clientId, orderId, installmentId) => {
-        Alert.alert("Cancelar pagamento", "Marcar esta parcela como não paga?", [
-            { text: "Voltar", style: "cancel" },
-            {
-                text: "Confirmar",
-                style: "destructive",
-                onPress: () => { setInstallmentPaid(installmentId, false); loadData(); },
-            },
-        ]);
+    const handleUnpayInstallment = (clientId, orderId, installmentId) =>
+        setConfirmUnpayInstallment({ visible: true, clientId, orderId, installmentId });
+
+    const _doUnpayInstallment = () => {
+        setInstallmentPaid(confirmUnpayInstallment.installmentId, false);
+        loadData();
     };
 
     const openAddInstallment = (orderId) => {
@@ -455,7 +412,10 @@ export function useClients() {
 
     const handleAddInstallment = (clientId) => {
         const value = parseCurrency(addInstallmentValue);
-        if (!value || value <= 0) { Alert.alert("Valor inválido", "Informe um valor válido para a parcela."); return; }
+        if (!value || value <= 0) {
+            handleMessage(false, "Valor inválido", "Informe um valor válido para a parcela.");
+            return;
+        }
         const client = clients.find((c) => c.clientId === clientId);
         const order  = client?.orders?.find((o) => o.orderId === selectedOrderId);
         if (!order) return;
@@ -553,5 +513,15 @@ export function useClients() {
         handleCompleteOrder,
         handleRecoverOrder, handleDeleteCancelledOrder,
         toggleClient, toggleOrder,
+        // estados dos modais de confirmação (consumidos pela ClientsScreen)
+        confirmDeleteClient,   setConfirmDeleteClient,   _doDeleteClient,
+        confirmCancelOrder,    setConfirmCancelOrder,    _doCancelOrder,
+        confirmDeleteOrder,    setConfirmDeleteOrder,    _doDeleteOrder,
+        confirmRecoverOrder,   setConfirmRecoverOrder,   _doRecoverOrder,
+        confirmCompleteOrder,  setConfirmCompleteOrder,  _doCompleteOrder,
+        confirmDeleteCancelled,setConfirmDeleteCancelled,_doDeleteCancelledOrder,
+        confirmPayInstallment, setConfirmPayInstallment, _doPayInstallment,
+        confirmUnpayInstallment,setConfirmUnpayInstallment,_doUnpayInstallment,
+        confirmAllPaidComplete, setConfirmAllPaidComplete,
     };
 }

@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
-import { Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { formatCurrency, parseCurrency } from "../shared/helpers";
 import { getSession } from "../../../functions/shared/secureStorage";
+import { handleMessage } from "../../../components/general/ToastMessage";
 import {
     initDatabase,
     getProducts,
@@ -32,13 +32,16 @@ export const PRODUCT_CATEGORIES = [
 ];
 
 export function useProducts() {
-    const [products, setProducts] = useState([]);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null);
-    const [form, setForm] = useState(EMPTY_FORM);
-    const [expandedId, setExpandedId] = useState(null);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [products,      setProducts]      = useState([]);
+    const [modalVisible,  setModalVisible]  = useState(false);
+    const [editingProduct,setEditingProduct]= useState(null);
+    const [form,          setForm]          = useState(EMPTY_FORM);
+    const [expandedId,    setExpandedId]    = useState(null);
+    const [searchQuery,   setSearchQuery]   = useState("");
     const [searchVisible, setSearchVisible] = useState(false);
+
+    // Modal de confirmação de exclusão
+    const [confirmDelete, setConfirmDelete] = useState({ visible: false, product: null });
 
     // ── Carregar ─────────────────────────────────────────────────────────────
 
@@ -67,11 +70,11 @@ export function useProducts() {
     const openEditModal = (product) => {
         setEditingProduct(product);
         setForm({
-            name: product.name,
-            quantity: String(product.quantity),
-            price: formatCurrency(String(Math.round(product.price * 100))),
+            name:        product.name,
+            quantity:    String(product.quantity),
+            price:       formatCurrency(String(Math.round(product.price * 100))),
             description: product.description || "",
-            category: product.category || "Outros",
+            category:    product.category || "Outros",
         });
         setModalVisible(true);
     };
@@ -86,15 +89,15 @@ export function useProducts() {
 
     const handleSave = async () => {
         if (!form.name.trim()) {
-            Alert.alert("Campo obrigatório", "Informe o nome do produto.");
+            handleMessage(false, "Campo obrigatório", "Informe o nome do produto.");
             return;
         }
         if (!form.quantity || isNaN(Number(form.quantity)) || Number(form.quantity) < 0) {
-            Alert.alert("Campo inválido", "Informe uma quantidade válida.");
+            handleMessage(false, "Campo inválido", "Informe uma quantidade válida.");
             return;
         }
         if (!form.price) {
-            Alert.alert("Campo obrigatório", "Informe o valor do produto.");
+            handleMessage(false, "Campo obrigatório", "Informe o valor do produto.");
             return;
         }
 
@@ -105,23 +108,23 @@ export function useProducts() {
         const product = editingProduct
             ? {
                 ...editingProduct,
-                name: form.name.trim(),
-                quantity: parseInt(form.quantity, 10),
-                price: parseCurrency(form.price),
+                name:        form.name.trim(),
+                quantity:    parseInt(form.quantity, 10),
+                price:       parseCurrency(form.price),
                 description: form.description.trim(),
-                category: form.category,
-                updatedAt: now,
+                category:    form.category,
+                updatedAt:   now,
             }
             : {
-                productId: `prod_${now}_${Math.random().toString(36).slice(2)}`,
-                userId: user.id,
-                name: form.name.trim(),
-                quantity: parseInt(form.quantity, 10),
-                price: parseCurrency(form.price),
+                productId:   `prod_${now}_${Math.random().toString(36).slice(2)}`,
+                userId:      user.id,
+                name:        form.name.trim(),
+                quantity:    parseInt(form.quantity, 10),
+                price:       parseCurrency(form.price),
                 description: form.description.trim(),
-                category: form.category,
-                createdAt: now,
-                updatedAt: now,
+                category:    form.category,
+                createdAt:   now,
+                updatedAt:   now,
             };
 
         upsertProduct(product);
@@ -129,22 +132,13 @@ export function useProducts() {
         loadProducts();
     };
 
-    const handleDelete = (product) => {
-        Alert.alert(
-            "Excluir produto",
-            `Tem certeza que deseja excluir "${product.name}"?`,
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Excluir",
-                    style: "destructive",
-                    onPress: () => {
-                        deleteProduct(product.productId);
-                        loadProducts();
-                    },
-                },
-            ]
-        );
+    // Abre modal de confirmação — a ação real fica em _doDelete
+    const handleDelete = (product) =>
+        setConfirmDelete({ visible: true, product });
+
+    const _doDelete = () => {
+        deleteProduct(confirmDelete.product.productId);
+        loadProducts();
     };
 
     // ── Expand ────────────────────────────────────────────────────────────────
@@ -195,5 +189,7 @@ export function useProducts() {
         handleSave,
         handleDelete,
         toggleExpand,
+        // confirmação de exclusão (consumido pela ProductsScreen)
+        confirmDelete, setConfirmDelete, _doDelete,
     };
 }

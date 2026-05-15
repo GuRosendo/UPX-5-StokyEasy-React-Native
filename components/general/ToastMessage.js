@@ -16,8 +16,9 @@ export const handleMessage = async(success, status, message, warning) => {
         type: warning ? "info" : (success ? "success" : "error"),
         text1: status,
         text2: message,
-        position: "bottom",
-        autoHide: 5000,
+        position: "top",
+        visibilityTime: 5000,
+        autoHide: true,
         props: {
             currentTheme: currentTheme 
         }
