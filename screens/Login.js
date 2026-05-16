@@ -1,5 +1,5 @@
-import React, { useState, useContext, useCallback, useEffect  } from 'react';
-import { Keyboard, ActivityIndicator } from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
+import { Keyboard, ActivityIndicator, Image, StyleSheet } from 'react-native';
 import {
     InnerContainer,
     PageTitle,
@@ -21,8 +21,6 @@ import KeyboardProperlyWorking from './../components/general/KeyboardProperlyWor
 import { handleLogin } from '../functions/Login';
 import { LoginDataContext } from '../components/LoginDataContext';
 
-import { LogoCustom } from '../components/general/LogoCustom';
-
 //input
 import { Input } from '../components/general/Input';
 import { persistLogin } from '../functions/PersistLogin';
@@ -34,12 +32,11 @@ const Login = ({ navigation, route }) => {
     const [hideTextPresentation, setHideTextPresentation] = useState(false);
     const [isChecked, setIsChecked] = useState(false);
 
-    const {storedData, setStoredData} = useContext(LoginDataContext);
+    const { storedData, setStoredData } = useContext(LoginDataContext);
 
     const [hidePasswordInput, setHidePasswordInput] = useState(false);
 
     const { theme, themeColors } = useTheme();
-        
     const colors = themeColors[theme];
 
     Keyboard.addListener('keyboardDidShow', () => {
@@ -49,12 +46,12 @@ const Login = ({ navigation, route }) => {
         setHideTextPresentation(false);
     });
 
-    const handleKeepConnected = () => {        
+    const handleKeepConnected = () => {
         setIsChecked(!isChecked);
-    };  
+    };
 
     useEffect(() => {
-        if(route.params){
+        if (route.params) {
             setHidePasswordInput(false);
         }
     }, [route.params]);
@@ -63,25 +60,30 @@ const Login = ({ navigation, route }) => {
         <KeyboardProperlyWorking>
             <FundoApp>
                 <InnerContainer>
-                    {!hideTextPresentation && 
-                        <>
-                            <LogoCustom bottom={false}/>
-                        </>
-                    }
+                    {!hideTextPresentation && (
+                        <Image
+                            source={require('../assets/images/logoStokyEasySmaller.png')}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
+                    )}
 
-                    <SubTitle color={colors.text}>Seja bem vindo(a) ao <SubTitle boldOnText={true}>StokyEasy!</SubTitle></SubTitle>
+                    <SubTitle color={colors.text}>
+                        Seja bem vindo(a) ao{' '}
+                        <SubTitle boldOnText={true}>StokyEasy!</SubTitle>
+                    </SubTitle>
 
                     <Formik
                         initialValues={{ login: '', password: '' }}
                         onSubmit={(values, { setSubmitting }) => {
                             setSubmitting(true);
 
-                            setTimeout(async() => { 
-                                if(await handleLogin(values)){
+                            setTimeout(async () => {
+                                if (await handleLogin(values)) {
                                     await persistLogin(values, setStoredData);
                                 }
                                 setSubmitting(false);
-                            }, 1000)
+                            }, 1000);
                         }}
                     >
                         {({ handleChange, handleBlur, handleSubmit, isSubmitting, values }) => (
@@ -109,25 +111,46 @@ const Login = ({ navigation, route }) => {
                                         setHidePassword={setHidePassword}
                                     />
                                 )}
-                                
-                                {!isSubmitting && 
-                                    <StyledButton onPress={handleSubmit} background={theme == "light" ? colors.mediumRed : colors.darkRed}>
+
+                                {!isSubmitting && (
+                                    <StyledButton
+                                        onPress={handleSubmit}
+                                        background={theme === 'light' ? colors.mediumRed : colors.darkRed}
+                                    >
                                         <ButtonText color={colors.white}>Entrar</ButtonText>
                                     </StyledButton>
-                                }
+                                )}
 
-                                {isSubmitting && 
-                                    <StyledButton disabled={true} background={theme == "light" ? colors.mediumRed : colors.darkRed}>
-                                        <ActivityIndicator size="large" color={colors.white}/>
+                                {isSubmitting && (
+                                    <StyledButton
+                                        disabled={true}
+                                        background={theme === 'light' ? colors.mediumRed : colors.darkRed}
+                                    >
+                                        <ActivityIndicator size="large" color={colors.white} />
                                     </StyledButton>
-                                }
+                                )}
 
-                                <Line color={colors.text}/>
+                                <ExtraView
+                                    isReceiveCode={true}
+                                    style={{ justifyContent: 'flex-end', marginTop: 4 }}
+                                >
+                                    <TextLink onPress={() => navigation.navigate('ForgotPassword')}>
+                                        <TextLinkContent color={colors.text}>
+                                            Esqueci minha senha
+                                        </TextLinkContent>
+                                    </TextLink>
+                                </ExtraView>
+
+                                <Line color={colors.text} />
 
                                 <ExtraView isReceiveCode={true}>
-                                    <ExtraText color={colors.text}>Ainda não possui uma conta? </ExtraText>
-                                    <TextLink onPress={() => navigation.navigate("RequestLogin")}>
-                                        <TextLinkContent color={colors.text}>Clique aqui</TextLinkContent>
+                                    <ExtraText color={colors.text}>
+                                        Ainda não possui uma conta?{' '}
+                                    </ExtraText>
+                                    <TextLink onPress={() => navigation.navigate('RequestLogin')}>
+                                        <TextLinkContent color={colors.text}>
+                                            Clique aqui
+                                        </TextLinkContent>
                                     </TextLink>
                                 </ExtraView>
                             </StyledFormArea>
@@ -138,5 +161,13 @@ const Login = ({ navigation, route }) => {
         </KeyboardProperlyWorking>
     );
 };
+
+const styles = StyleSheet.create({
+    logo: {
+        width: 180,
+        height: 180,
+        marginBottom: 15,
+    },
+});
 
 export default Login;

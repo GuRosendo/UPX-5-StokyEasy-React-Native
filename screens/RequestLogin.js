@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet } from 'react-native';
 import {
     InnerContainer,
     StyledFormArea,
@@ -29,7 +29,6 @@ import { sexo } from '../assets/data/options';
 import { formatDate } from '../functions/general/Masks';
 //formats strings 
 import { formatWeight, formatHeight, formatCellphone } from '../functions/general/Masks';
-import { LogoCustom } from '../components/general/LogoCustom';
 
 import { useTheme } from '../components/ThemeContext';
 
@@ -38,23 +37,20 @@ const RequestLogin = ({ navigation }) => {
     const [numeroResidencia, setNumeroResidencia] = useState("");
 
     const { theme, themeColors } = useTheme();
-                
     const colors = themeColors[theme];
 
-    //selected sex value
     const [sexSelected, setSexSelected] = useState("");
 
     useEffect(() => {
-        if(!hasNumber){
+        if (!hasNumber) {
             setNumeroResidencia('Sem número');
         }
-        
-        if(hasNumber){
+
+        if (hasNumber) {
             setNumeroResidencia("");
         }
     }, [hasNumber]);
 
-    //date of birth
     const [dateSelected, setDateSelected] = useState("");
 
     const [hidePassword, setHidePassword] = useState(true);
@@ -62,9 +58,13 @@ const RequestLogin = ({ navigation }) => {
 
     return (
         <KeyboardProperlyWorking isScrollView={true}>
-            <FundoApp style={{marginBottom: 130}}>
+            <FundoApp style={{ marginBottom: 130 }}>
                 <InnerContainer>
-                    <LogoCustom bottom={false} />
+                    <Image
+                        source={require('../assets/images/logoStokyEasySmaller.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
 
                     <Formik
                         initialValues={{
@@ -73,15 +73,15 @@ const RequestLogin = ({ navigation }) => {
                         onSubmit={(values, { setSubmitting }) => {
                             setSubmitting(true);
 
-                            values = { 
-                                ...values, 
-                                sexo: sexSelected, 
-                                dataNascimento: formatDate(dateSelected, "EUA", true), //Date value, format, return time
+                            values = {
+                                ...values,
+                                sexo: sexSelected,
+                                dataNascimento: formatDate(dateSelected, "EUA", true),
                             };
 
-                            setTimeout(async() => { 
-                                if(await handleRequestLogin(values)){
-                                    navigation.navigate("Login")
+                            setTimeout(async () => {
+                                if (await handleRequestLogin(values)) {
+                                    navigation.navigate("Login");
                                 }
                                 setSubmitting(false);
                             }, 2000);
@@ -102,7 +102,6 @@ const RequestLogin = ({ navigation }) => {
                                     placeholder="Informe seu sexo"
                                     icon="genderless"
                                     placeholderTextColor={colors.text}
-                                    //dropdown properties
                                     rightIcon="chevron-down"
                                     isDropdown={true}
                                     canSearch={false}
@@ -110,10 +109,10 @@ const RequestLogin = ({ navigation }) => {
                                     dropdownData={sexo}
                                     searchInputPlaceholder={"Pesquisar"}
                                     arrowAlign={true}
-                                    saveType={"text"} //Returns one index of your data
-                                    textShow={"text"} //Shows one index of your data
+                                    saveType={"text"}
+                                    textShow={"text"}
                                     onSelect={setSexSelected}
-                                    onSelectText={"text"} //Shows one index of your data when selected
+                                    onSelectText={"text"}
                                     scrollEnabled={false}
                                 />
                                 <Input
@@ -171,19 +170,28 @@ const RequestLogin = ({ navigation }) => {
                                     hidePassword={hidePassword}
                                     setHidePassword={setHidePassword}
                                 />
+
                                 {!isSubmitting &&
-                                    <StyledButton onPress={handleSubmit} FormRequestLogin={true} background={theme == "light" ? colors.mediumRed : colors.darkRed}>
+                                    <StyledButton
+                                        onPress={handleSubmit}
+                                        FormRequestLogin={true}
+                                        background={theme === "light" ? colors.mediumRed : colors.darkRed}
+                                    >
                                         <ButtonText color={colors.white}>Criar Conta</ButtonText>
                                     </StyledButton>
                                 }
 
                                 {isSubmitting &&
-                                    <StyledButton disabled={true} FormRequestLogin={true} background={theme == "light" ? colors.mediumRed : colors.darkRed}>
+                                    <StyledButton
+                                        disabled={true}
+                                        FormRequestLogin={true}
+                                        background={theme === "light" ? colors.mediumRed : colors.darkRed}
+                                    >
                                         <ActivityIndicator size="large" color={colors.white} />
                                     </StyledButton>
                                 }
 
-                                <Line color={colors.text}/>
+                                <Line color={colors.text} />
 
                                 <ExtraView>
                                     <ExtraText color={colors.text}>Não era o que você estava procurando? </ExtraText>
@@ -191,7 +199,6 @@ const RequestLogin = ({ navigation }) => {
                                         <TextLinkContent color={colors.text}>Voltar</TextLinkContent>
                                     </TextLink>
                                 </ExtraView>
-
                             </StyledFormArea>
                         )}
                     </Formik>
@@ -199,6 +206,14 @@ const RequestLogin = ({ navigation }) => {
             </FundoApp>
         </KeyboardProperlyWorking>
     );
-}
+};
+
+const styles = StyleSheet.create({
+    logo: {
+        width: 180,
+        height: 180,
+        marginBottom: 15,
+    },
+});
 
 export default RequestLogin;

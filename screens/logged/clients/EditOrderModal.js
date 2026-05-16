@@ -15,9 +15,9 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Linking,
 } from "react-native";
+import { handleMessage } from "../../../components/general/ToastMessage";
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { Input } from "../../../components/general/Input";
@@ -188,20 +188,12 @@ export function EditOrderModal({
 
   // ── Remover parcela não paga ───────────────────────────────────────────────
   const removeInstallment = (installmentId) => {
-    Alert.alert("Remover parcela", "Deseja remover esta parcela? O valor total será recalculado.", [
-      { text: "Voltar", style: "cancel" },
-      {
-        text: "Remover",
-        style: "destructive",
-        onPress: () => {
-          setInstallments((prev) => {
-            const filtered  = prev.filter((i) => i.installmentId !== installmentId);
-            const reindexed = filtered.map((i, idx) => ({ ...i, index: idx + 1 }));
-            return recalcPending(reindexed, productId, quantity);
-          });
-        },
-      },
-    ]);
+    setInstallments((prev) => {
+      const filtered  = prev.filter((i) => i.installmentId !== installmentId);
+      const reindexed = filtered.map((i, idx) => ({ ...i, index: idx + 1 }));
+      return recalcPending(reindexed, productId, quantity);
+    });
+    handleMessage(true, "Parcela removida", "O valor total foi recalculado.");
   };
 
   const updateInstValue = (installmentId, rawText) => {
@@ -236,15 +228,15 @@ export function EditOrderModal({
     const url     = `whatsapp://send?text=${encoded}`;
     Linking.canOpenURL(url)
       .then((ok) => Linking.openURL(ok ? url : `https://wa.me/?text=${encoded}`))
-      .catch(() => Alert.alert("Erro", "Não foi possível abrir o WhatsApp."));
+      .catch(() => handleMessage(false, "Erro", "Não foi possível abrir o WhatsApp."));
   };
 
   // ── Salvar ─────────────────────────────────────────────────────────────────
   const handleSave = () => {
     const qty = parseInt(quantity, 10);
-    if (!productId)          { Alert.alert("Produto obrigatório", "Selecione um produto."); return; }
-    if (!qty || qty <= 0)    { Alert.alert("Quantidade inválida", "Informe uma quantidade maior que zero."); return; }
-    if (!installments.length){ Alert.alert("Sem parcelas", "O pedido precisa ter ao menos uma parcela."); return; }
+    if (!productId)          { handleMessage(false, "Produto obrigatório", "Selecione um produto."); return; }
+    if (!qty || qty <= 0)    { handleMessage(false, "Quantidade inválida", "Informe uma quantidade maior que zero."); return; }
+    if (!installments.length){ handleMessage(false, "Sem parcelas", "O pedido precisa ter ao menos uma parcela."); return; }
 
     const prod        = userProducts.find((p) => p.productId === productId);
     const originalQty = order?.quantity || 0;
@@ -255,7 +247,7 @@ export function EditOrderModal({
       const delta    = originalQty - qty;
       const newStock = (prod?.quantity ?? 0) + delta;
       if (newStock < 0) {
-        Alert.alert("Estoque insuficiente", `Disponível: ${prod.quantity + originalQty} un. de "${prod.name}".`);
+        handleMessage(false, "Estoque insuficiente", `Disponível: ${prod.quantity + originalQty} un. de "${prod.name}".`);
         return;
       }
       stockDeltas.push({ productId, delta });
@@ -263,7 +255,7 @@ export function EditOrderModal({
       if (originalProduct) stockDeltas.push({ productId: originalProduct.productId, delta: +originalQty });
       const newStock = (prod?.quantity ?? 0) - qty;
       if (newStock < 0) {
-        Alert.alert("Estoque insuficiente", `Disponível: ${prod.quantity} un. de "${prod.name}".`);
+        handleMessage(false, "Estoque insuficiente", `Disponível: ${prod.quantity} un. de "${prod.name}".`);
         return;
       }
       stockDeltas.push({ productId, delta: -qty });

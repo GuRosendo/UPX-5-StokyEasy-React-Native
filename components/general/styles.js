@@ -116,7 +116,7 @@ export const StyledFormArea = styled.View`
     width: 90%;
 
     ${(props) => props.RequestLoginForm && `
-        margin-top: 30%;
+        margin-top: 10%;
     `}
 
     ${(props) => props.isReceiveCode && `

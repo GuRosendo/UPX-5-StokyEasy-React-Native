@@ -4,6 +4,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { FontAwesome6 } from "@expo/vector-icons";
 
 import Login from "../screens/Login";
+import ForgotPassword from "../screens/forgot/ForgotPassword";
 import RequestLogin from "../screens/RequestLogin";
 
 import { LoginDataContext } from "../components/LoginDataContext";
@@ -69,6 +70,7 @@ const NavigationRootStack = () => {
                             <>
                                 <Stack.Screen name="Login" component={Login} />
                                 <Stack.Screen name="RequestLogin" component={RequestLogin} />
+                                <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
                             </>
                         )}
 
