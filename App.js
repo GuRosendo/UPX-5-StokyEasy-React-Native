@@ -12,76 +12,10 @@ import { ThemeProvider } from "./components/ThemeContext";
 import { loadThemeFromStorage } from "./components/LoadThemeFromStorage";
 
 import { handleMessage } from "./components/general/ToastMessage";
+import { ToastPortal } from "./components/general/ToastPortal";
 import { PageTitle } from "./components/general/styles";
 
 import { initDatabase } from "./screens/logged/shared/database";
-
-const toastConfig = {
-  success: (props) => (
-    <BaseToast
-      {...props}
-      style={{
-        borderLeftColor: "#186C8C",
-        backgroundColor: props.props?.currentTheme == "light" ? "#FFFFFF" : "#1E1E1E",
-        borderLeftWidth: 7,
-        width: "90%",
-        height: 100,
-      }}
-      text1Style={{
-        fontSize: 17,
-        fontWeight: "700",
-        color: props.props?.currentTheme == "light" ? "#000000" : "#F2F0EF",
-      }}
-      text2Style={{
-        fontSize: 14,
-        color: props.props?.currentTheme == "light" ? "#000000" : "#F2F0EF",
-      }}
-    />
-  ),
-  error: (props) => (
-    <ErrorToast
-      {...props}
-      text2NumberOfLines={3}
-      style={{
-        borderLeftColor: "#A70000",
-        backgroundColor: props.props?.currentTheme == "light" ? "#FFFFFF" : "#1E1E1E",
-        borderLeftWidth: 7,
-        width: "90%",
-        height: 100,
-      }}
-      text1Style={{
-        fontSize: 17,
-        fontWeight: "700",
-        color: props.props?.currentTheme == "light" ? "#000000" : "#F2F0EF",
-      }}
-      text2Style={{
-        fontSize: 14,
-        color: props.props?.currentTheme == "light" ? "#000000" : "#F2F0EF",
-      }}
-    />
-  ),
-  info: (props) => (
-    <BaseToast
-      {...props}
-      style={{
-        borderLeftColor: "#F4D03F",
-        backgroundColor: props.props?.currentTheme == "light" ? "#FFFFFF" : "#1E1E1E",
-        borderLeftWidth: 7,
-        width: "90%",
-        height: 100,
-      }}
-      text1Style={{
-        fontSize: 17,
-        fontWeight: "700",
-        color: props.props?.currentTheme == "light" ? "#000000" : "#F2F0EF",
-      }}
-      text2Style={{
-        fontSize: 14,
-        color: props.props?.currentTheme == "light" ? "#000000" : "#F2F0EF",
-      }}
-    />
-  )
-};
 
 export default function Index() {
   const [appLoaded, setAppLoaded] = useState(false);
@@ -169,7 +103,7 @@ export default function Index() {
             </ThemeProvider>
           </LoginDataContext.Provider>
 
-          <Toast config={toastConfig} />
+          <ToastPortal theme={theme} />
         </>
       )}
     </View>

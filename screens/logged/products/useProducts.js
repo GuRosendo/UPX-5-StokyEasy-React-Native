@@ -10,7 +10,7 @@ import {
     deleteProduct,
 } from "../shared/database";
 
-const EMPTY_FORM = { name: "", quantity: "", price: "", description: "", category: "Outros" };
+const EMPTY_FORM = { name: "", quantity: "", price: "", description: "", category: "Outros", imageUri: "" };
 
 export const PRODUCT_CATEGORIES = [
     "Joias e Acessórios",
@@ -75,6 +75,7 @@ export function useProducts() {
             price:       formatCurrency(String(Math.round(product.price * 100))),
             description: product.description || "",
             category:    product.category || "Outros",
+            imageUri:    product.imageUri || "",
         });
         setModalVisible(true);
     };
@@ -113,6 +114,7 @@ export function useProducts() {
                 price:       parseCurrency(form.price),
                 description: form.description.trim(),
                 category:    form.category,
+                imageUri:    form.imageUri || "",
                 updatedAt:   now,
             }
             : {
@@ -123,6 +125,7 @@ export function useProducts() {
                 price:       parseCurrency(form.price),
                 description: form.description.trim(),
                 category:    form.category,
+                imageUri:    form.imageUri || "",
                 createdAt:   now,
                 updatedAt:   now,
             };

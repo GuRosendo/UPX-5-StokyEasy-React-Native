@@ -4,8 +4,12 @@ import { FontAwesome6 } from "@expo/vector-icons";
 import { formatPhone } from "../shared/helpers";
 import { Input } from "../../../components/general/Input";
 import { styles } from "./clients.styles";
+import { ToastPortal } from "../../../components/general/ToastPortal";
+import { useTheme } from "../../../components/ThemeContext";
 
 export function ClientModal({ visible, editingClient, form, setForm, onSave, onClose, colors }) {
+  const { theme } = useTheme();
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -81,6 +85,8 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <ToastPortal theme={theme} />
     </Modal>
   );
 }

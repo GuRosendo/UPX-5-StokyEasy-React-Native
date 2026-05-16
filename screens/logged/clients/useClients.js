@@ -189,7 +189,7 @@ export function useClients() {
             const inst = parseInt(item.installments, 10);
             if (!item.productId) { handleMessage(false, "Produto obrigatório", `Selecione um produto no item ${i + 1}.`); return; }
             if (!qty || qty <= 0) { handleMessage(false, "Campo inválido", `Quantidade inválida no item ${i + 1}.`); return; }
-            if (!inst || inst <= 0) { handleMessage(false, "Campo inválido", `Nº de parcelas inválido no item ${i + 1}.`); return; }
+            if (!item.aVista && (!inst || inst <= 0)) { handleMessage(false, "Campo inválido", `Nº de parcelas inválido no item ${i + 1}.`); return; }
         }
 
         const user = await getSession();
@@ -209,10 +209,10 @@ export function useClients() {
 
         const now = Date.now();
         for (let i = 0; i < orderItems.length; i++) {
-            const item = orderItems[i];
-            const qty  = parseInt(item.quantity, 10);
-            const inst = parseInt(item.installments, 10);
-            const prod = products.find((p) => p.productId === item.productId);
+            const item  = orderItems[i];
+            const qty   = parseInt(item.quantity, 10);
+            const inst  = parseInt(item.installments, 10);
+            const prod  = products.find((p) => p.productId === item.productId);
             const total = prod.price * qty;
 
             updateProductQuantity(prod.productId, prod.quantity - qty);
@@ -222,16 +222,18 @@ export function useClients() {
                 userId:     user.id,
                 totalValue: total,
                 quantity:   qty,
-                status:     "active",
+                status:     item.aVista ? "completed" : "active",
                 productRef: prod.name,
                 productId:  prod.productId,
                 createdAt:  now,
-                installments: Array.from({ length: inst }, (_, j) => ({
-                    installmentId: `inst_${now}_${i}_${j}`,
-                    index:   j + 1,
-                    value:   total / inst,
-                    dueDate: orderFirstDueDate ? addMonths(orderFirstDueDate, j) : null,
-                })),
+                installments: item.aVista
+                    ? []
+                    : Array.from({ length: inst }, (_, j) => ({
+                        installmentId: `inst_${now}_${i}_${j}`,
+                        index:   j + 1,
+                        value:   total / inst,
+                        dueDate: orderFirstDueDate ? addMonths(orderFirstDueDate, j) : null,
+                    })),
             });
         }
         closeOrderModal();

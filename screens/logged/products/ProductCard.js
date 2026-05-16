@@ -1,4 +1,4 @@
-import { View, TouchableOpacity } from "react-native";
+import { View, TouchableOpacity, Image } from "react-native";
 import { Text, Card, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { styles } from "./products.styles";
@@ -14,11 +14,19 @@ export function ProductCard({ product, isExpanded, onToggle, onEdit, onDelete, c
             subtitle={`Qtd: ${product.quantity}  •  R$ ${product.price.toFixed(2).replace(".", ",")}`}
             titleStyle={{ fontSize: 17, fontWeight: "600", color: colors.text }}
             subtitleStyle={{ opacity: 0.7, color: colors.text }}
-            left={() => (
-              <View style={[styles.iconContainer, { backgroundColor: colors.mediumRedOpaque }]}>
-                <FontAwesome6 name="box" size={18} color={colors.mediumRed} />
-              </View>
-            )}
+            left={() =>
+              product.imageUri ? (
+                <Image
+                  source={{ uri: product.imageUri }}
+                  style={styles.cardThumbnail}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.iconContainer, { backgroundColor: colors.mediumRedOpaque }]}>
+                  <FontAwesome6 name="box" size={18} color={colors.mediumRed} />
+                </View>
+              )
+            }
             right={() => (
               <FontAwesome6
                 name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -32,6 +40,15 @@ export function ProductCard({ product, isExpanded, onToggle, onEdit, onDelete, c
 
         {isExpanded && (
           <Card.Content style={styles.expandedContent}>
+            {/* Imagem expandida */}
+            {/* {product.imageUri && (
+              <Image
+                source={{ uri: product.imageUri }}
+                style={styles.cardImage}
+                resizeMode="cover"
+              />
+            )} */}
+
             {/* Badge de categoria */}
             {product.category ? (
               <View style={[styles.categoryBadge, { backgroundColor: colors.mediumRedOpaque }]}>

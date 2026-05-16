@@ -17,6 +17,7 @@ export function initDatabase() {
       price       REAL NOT NULL DEFAULT 0,
       description TEXT DEFAULT '',
       category    TEXT DEFAULT 'Outros',
+      imageUri    TEXT DEFAULT '',
       createdAt   INTEGER NOT NULL,
       updatedAt   INTEGER NOT NULL
     );
@@ -55,12 +56,9 @@ export function initDatabase() {
     );
   `);
 
-  // Migração segura: adicionar dueDate se veio de versão anterior sem ela
-  try {
-    db.execSync("ALTER TABLE installments ADD COLUMN dueDate INTEGER;");
-  } catch (_) {
-    // coluna já existe — ignorar
-  }
+  // Migrações seguras para bancos criados em versões anteriores
+  try { db.execSync("ALTER TABLE installments ADD COLUMN dueDate INTEGER;"); } catch (_) {}
+  try { db.execSync("ALTER TABLE products ADD COLUMN imageUri TEXT DEFAULT '';"); } catch (_) {}
 }
 
 // ─── PRODUTOS ─────────────────────────────────────────────────────────────────
@@ -78,19 +76,21 @@ export function getProductById(productId) {
 
 export function upsertProduct(product) {
   db.runSync(
-    `INSERT INTO products (productId, userId, name, quantity, price, description, category, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO products (productId, userId, name, quantity, price, description, category, imageUri, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(productId) DO UPDATE SET
        name        = excluded.name,
        quantity    = excluded.quantity,
        price       = excluded.price,
        description = excluded.description,
        category    = excluded.category,
+       imageUri    = excluded.imageUri,
        updatedAt   = excluded.updatedAt`,
     [
-      product.productId, product.userId, product.name,
-      product.quantity,  product.price,  product.description ?? "",
-      product.category ?? "Outros",      product.createdAt,  product.updatedAt,
+      product.productId, product.userId,      product.name,
+      product.quantity,  product.price,        product.description ?? "",
+      product.category ?? "Outros",            product.imageUri ?? "",
+      product.createdAt, product.updatedAt,
     ]
   );
 }
@@ -176,7 +176,6 @@ export function insertOrder(order) {
   }
 }
 
-// Atualiza produto, quantidade e valor total do pedido numa única chamada
 export function updateOrderCore(orderId, { totalValue, quantity, productRef, productId }) {
   db.runSync(
     "UPDATE orders SET totalValue = ?, quantity = ?, productRef = ?, productId = ? WHERE orderId = ?",
@@ -235,7 +234,6 @@ export function deleteInstallment(installmentId) {
   db.runSync("DELETE FROM installments WHERE installmentId = ?", [installmentId]);
 }
 
-// Reindexar parcelas após remoção — mantém idx contínuo (1, 2, 3 …)
 export function reindexInstallments(orderId) {
   const rows = db.getAllSync(
     "SELECT installmentId FROM installments WHERE orderId = ? ORDER BY idx ASC",

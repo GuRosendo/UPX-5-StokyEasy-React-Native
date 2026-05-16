@@ -35,6 +35,22 @@ export const styles = StyleSheet.create({
 
   card: { marginBottom: 12, borderRadius: 16, elevation: 1 },
   iconContainer: { padding: 10, borderRadius: 12 },
+
+  // Thumbnail no header do card
+  cardThumbnail: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+  },
+
+  // Imagem expandida no card
+  cardImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+
   expandedContent: { paddingTop: 4, paddingBottom: 8, gap: 6 },
   descriptionText: { fontSize: 14, opacity: 0.8, marginBottom: 4 },
   detailText: { fontSize: 13, opacity: 0.7 },
@@ -97,9 +113,8 @@ export const styles = StyleSheet.create({
     shadowRadius: 3,
   },
 
-  // Modal
+  // Modal principal
   modalOverlay: { flex: 1, backgroundColor: "#00000090", justifyContent: "flex-end" },
-  keyboardAvoidingModal: { width: "100%" },
   modalBox: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -119,4 +134,99 @@ export const styles = StyleSheet.create({
   row: { flexDirection: "row" },
   modalButtons: { flexDirection: "row", gap: 12, marginTop: 20, marginBottom: 8 },
   modalBtn: { flex: 1, borderRadius: 12 },
+
+  // Seletor de imagem no modal
+  imagePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+  imagePicker: {
+    width: 90,
+    height: 90,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePickerPreview: {
+    width: 90,
+    height: 90,
+  },
+  imagePickerPlaceholder: {
+    alignItems: "center",
+    gap: 6,
+  },
+  imagePickerText: {
+    fontSize: 11,
+    fontWeight: "500",
+    textAlign: "center",
+    opacity: 0.7,
+  },
+  imagePickerActions: {
+    flex: 1,
+    gap: 8,
+  },
+  imageActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  imageActionText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+
+  // Modal de escolha de origem da foto (câmera / galeria)
+  sourceOverlay: {
+    flex: 1,
+    backgroundColor: "#00000070",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  sourceBox: {
+    width: "100%",
+    borderRadius: 20,
+    padding: 24,
+    gap: 10,
+    elevation: 10,
+  },
+  sourceTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  sourceSubtitle: {
+    fontSize: 13,
+    opacity: 0.6,
+    marginBottom: 6,
+  },
+  sourceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+  },
+  sourceBtnText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  sourceCancelBtn: {
+    alignItems: "center",
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  sourceCancelText: {
+    fontSize: 14,
+    opacity: 0.45,
+  },
 });

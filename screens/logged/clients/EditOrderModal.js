@@ -24,6 +24,8 @@ import { Input } from "../../../components/general/Input";
 import { formatDate } from "../../../functions/general/Masks";
 import { toCurrencyDisplay, formatCurrency, parseCurrency } from "../shared/helpers";
 import { styles } from "./clients.styles";
+import { ToastPortal } from "../../../components/general/ToastPortal";
+import { useTheme } from "../../../components/ThemeContext";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -188,6 +190,11 @@ export function EditOrderModal({
 
   // ── Remover parcela não paga ───────────────────────────────────────────────
   const removeInstallment = (installmentId) => {
+    const unpaid = installments.filter((i) => !i.paid);
+    if (unpaid.length <= 1) {
+      handleMessage(false, "Não permitido", "O pedido precisa ter ao menos uma parcela.");
+      return;
+    }
     setInstallments((prev) => {
       const filtered  = prev.filter((i) => i.installmentId !== installmentId);
       const reindexed = filtered.map((i, idx) => ({ ...i, index: idx + 1 }));
@@ -238,9 +245,19 @@ export function EditOrderModal({
     if (!qty || qty <= 0)    { handleMessage(false, "Quantidade inválida", "Informe uma quantidade maior que zero."); return; }
     if (!installments.length){ handleMessage(false, "Sem parcelas", "O pedido precisa ter ao menos uma parcela."); return; }
 
+    const somaParc = installments.reduce((s, i) => s + (i.value || 0), 0);
     const prod        = userProducts.find((p) => p.productId === productId);
     const originalQty = order?.quantity || 0;
     const sameProduct = productId === order?.productId;
+    const totalPedido = prod ? prod.price * qty : 0;
+    if (somaParc > totalPedido + 0.01) {
+      handleMessage(
+        false,
+        "Parcelas excedem o total",
+        `A soma das parcelas (${toCurrencyDisplay(somaParc)}) não pode ultrapassar o valor do pedido (${toCurrencyDisplay(totalPedido)}).`
+      );
+      return;
+    }
     const stockDeltas = [];
 
     if (sameProduct) {
@@ -278,6 +295,7 @@ export function EditOrderModal({
   const totalParcelas = installments.reduce((s, i) => s + (i.value || 0), 0);
   const pendingCount  = installments.filter((i) => !i.paid).length;
   const paidCount     = installments.filter((i) => i.paid).length;
+  const { theme } = useTheme();
 
   if (!order) return null;
 
@@ -384,7 +402,8 @@ export function EditOrderModal({
               </Text>
             </View>
 
-            {/* ── Data da 1ª parcela (propaga mensalmente) ── */}
+            {/* ── Data da 1ª parcela (propaga mensalmente) — oculto para pedidos à vista ── */}
+            {installments.length > 0 && (
             <View style={[styles.dueDateSection, { borderColor: colors.mediumRed + "33", backgroundColor: colors.background }]}>
               <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 0, marginBottom: 8 }]}>
                 Datas de vencimento
@@ -406,51 +425,68 @@ export function EditOrderModal({
                 Ao definir a data da 1ª parcela, as demais serão geradas mensalmente. Ajuste individualmente abaixo se necessário.
               </Text>
             </View>
+            )}
 
             {/* ── Lista de parcelas ── */}
             <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 16 }]}>
               Parcelas ({installments.length})
             </Text>
 
-            {installments.map((inst) => (
+            {installments.length === 0 ? (
               <View
-                key={inst.installmentId}
                 style={[
-                  styles.installmentEditRow,
-                  {
-                    backgroundColor: inst.paid ? "#d5f5e311" : colors.background,
-                    borderColor:     inst.paid ? "#27ae6044" : colors.mediumRed + "33",
-                  },
+                  styles.previewBox,
+                  { backgroundColor: "#d5f5e322", borderWidth: 1, borderColor: "#27ae6033", borderRadius: 12, marginBottom: 4 },
                 ]}
               >
-                {/* Cabeçalho da parcela */}
-                <View style={styles.installmentEditHeader}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={[styles.installmentEditIndex, { color: colors.mediumRed }]}>
-                      #{inst.index}
-                    </Text>
-                    {inst.paid ? (
-                      <View style={styles.paidBadge}>
-                        <FontAwesome6 name="check" size={10} color="#27ae60" />
-                        <Text style={styles.paidText}>Pago</Text>
-                      </View>
-                    ) : (
-                      <View style={[styles.pendingBadge, { borderColor: colors.mediumRed + "55" }]}>
-                        <Text style={[styles.pendingBadgeText, { color: colors.mediumRed }]}>Pendente</Text>
-                      </View>
+                <FontAwesome6 name="circle-check" size={18} color="#27ae60" />
+                <View style={{ marginLeft: 10, flex: 1 }}>
+                  <Text style={{ color: "#27ae60", fontWeight: "700", fontSize: 14 }}>
+                    Pedido à vista — Pago
+                  </Text>
+                  <Text style={{ color: "#27ae60", fontSize: 12, opacity: 0.8, marginTop: 2 }}>
+                    Este pedido foi registrado como pagamento imediato, sem parcelas.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              installments.map((inst) => (
+                <View
+                  key={inst.installmentId}
+                  style={[
+                    styles.installmentEditRow,
+                    {
+                      backgroundColor: inst.paid ? "#d5f5e311" : colors.background,
+                      borderColor:     inst.paid ? "#27ae6044" : colors.mediumRed + "33",
+                    },
+                  ]}
+                >
+                  {/* Cabeçalho da parcela */}
+                  <View style={styles.installmentEditHeader}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text style={[styles.installmentEditIndex, { color: colors.mediumRed }]}>
+                        #{inst.index}
+                      </Text>
+                      {inst.paid ? (
+                        <View style={styles.paidBadge}>
+                          <FontAwesome6 name="check" size={10} color="#27ae60" />
+                          <Text style={styles.paidText}>Pago</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.pendingBadge, { borderColor: colors.mediumRed + "55" }]}>
+                          <Text style={[styles.pendingBadgeText, { color: colors.mediumRed }]}>Pendente</Text>
+                        </View>
+                      )}
+                    </View>
+                    {!inst.paid && installments.filter((i) => !i.paid).length > 1 && (
+                      <TouchableOpacity onPress={() => removeInstallment(inst.installmentId)}>
+                        <FontAwesome6 name="trash" size={14} color="#c0392b" />
+                      </TouchableOpacity>
                     )}
                   </View>
-                  {!inst.paid && (
-                    <TouchableOpacity onPress={() => removeInstallment(inst.installmentId)}>
-                      <FontAwesome6 name="trash" size={14} color="#c0392b" />
-                    </TouchableOpacity>
-                  )}
-                </View>
 
-                {/* Valor + Vencimento */}
-                <View style={styles.installmentEditFields}>
                   {/* Valor */}
-                  <View style={{ flex: 1 }}>
+                  <View style={{ marginBottom: 4 }}>
                     {inst.paid ? (
                       <>
                         <Text style={[styles.label, { color: colors.text, marginTop: 0 }]}>Valor</Text>
@@ -478,7 +514,7 @@ export function EditOrderModal({
                   </View>
 
                   {/* Vencimento */}
-                  <View style={{ flex: 1 }}>
+                  <View>
                     <DatePickerField
                       value={inst.dueDate}
                       onChange={(ts) => updateInstDate(inst.installmentId, ts)}
@@ -488,13 +524,7 @@ export function EditOrderModal({
                     />
                   </View>
                 </View>
-              </View>
-            ))}
-
-            {installments.length === 0 && (
-              <Text style={[styles.hintText, { color: colors.text, textAlign: "center", marginTop: 8 }]}>
-                Nenhuma parcela. Salvar assim encerrará o pedido sem pendências.
-              </Text>
+              ))
             )}
 
             {/* ── Botões ── */}
@@ -543,6 +573,8 @@ export function EditOrderModal({
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+
+      <ToastPortal theme={theme} />
     </Modal>
   );
 }

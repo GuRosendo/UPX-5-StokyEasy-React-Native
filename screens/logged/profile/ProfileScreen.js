@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Input } from "../../../components/general/Input";
 import { formatCellphone } from "../../../functions/general/Masks";
 import { useProfile } from "./useProfile";
+import { ToastPortal } from "../../../components/general/ToastPortal";
 
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
@@ -371,6 +372,8 @@ export default function ProfileScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+
+        <ToastPortal theme={theme} />
       </Modal>
 
       {/* ════════════════════════════════════════════════════════════════════
@@ -493,6 +496,8 @@ export default function ProfileScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+
+        <ToastPortal theme={theme} />
       </Modal>
     </>
   );
