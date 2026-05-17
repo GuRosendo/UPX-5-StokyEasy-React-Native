@@ -73,8 +73,7 @@
           "photosPermission": "Precisamos de acesso à galeria para selecionar fotos.",
           "cameraPermission": "Precisamos de acesso à câmera para tirar fotos."
         }
-      ],
-      "expo-image-picker\\"
+      ]
     ]
   }
 }
