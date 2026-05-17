@@ -240,7 +240,7 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
               />
 
               {/* Botões */}
-              <View style={styles.modalButtons}>
+              <View style={[styles.modalButtons, { paddingBottom: 16 }]}>
                 <Button
                   mode="outlined"
                   onPress={onClose}

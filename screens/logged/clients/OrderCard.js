@@ -1,6 +1,7 @@
 import { View, TouchableOpacity, FlatList } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
+import { memo } from "react";
 import { toCurrencyDisplay } from "../shared/helpers";
 import { styles } from "./clients.styles";
 
@@ -9,7 +10,7 @@ function tsToDateStr(ts) {
   return new Date(ts).toLocaleDateString("pt-BR");
 }
 
-export function OrderCard({
+export const OrderCard = memo(function OrderCard({
   order,
   clientId,
   isExpanded,
@@ -130,4 +131,10 @@ export function OrderCard({
       )}
     </View>
   );
-}
+}, (prev, next) => {
+  return (
+    prev.order       === next.order &&
+    prev.isExpanded  === next.isExpanded &&
+    prev.colors      === next.colors
+  );
+});

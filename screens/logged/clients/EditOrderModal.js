@@ -56,7 +56,7 @@ function buildOrderText(order, client) {
   const pendingTotal = order.installments.filter((i) => !i.paid).reduce((s, i) => s + i.value, 0);
 
   order.installments.forEach((inst) => {
-    const dateStr = inst.dueDate ? ` ${tsToDateBR(inst.dueDate)} — ` : "";
+    const dateStr = inst.dueDate ? ` ${tsToDateBR(inst.dueDate)} = ` : "";
     const status  = inst.paid ? "— *Pago*" : "— *Pendente*";
     lines.push(` Parcela: ${dateStr} ${toCurrencyDisplay(inst.value)} ${status}`);
   });

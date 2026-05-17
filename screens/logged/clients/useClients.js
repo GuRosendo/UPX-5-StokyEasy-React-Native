@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { parseCurrency } from "../shared/helpers";
 import { getSession } from "../../../functions/shared/secureStorage";
@@ -6,6 +6,7 @@ import { handleMessage } from "../../../components/general/ToastMessage";
 import {
     initDatabase,
     getClients,
+    getClientsPaged,
     upsertClient,
     deleteClient,
     getProducts,
@@ -23,7 +24,8 @@ import {
     reindexInstallments,
 } from "../shared/database";
 
-const EMPTY_CLIENT     = { name: "", email: "", phone: "" };
+const PAGE_SIZE     = 30;
+const EMPTY_CLIENT  = { name: "", email: "", phone: "" };
 const EMPTY_ORDER_ITEM = { productId: "", quantity: "", installments: "" };
 
 function addMonths(ts, n) {
@@ -33,7 +35,13 @@ function addMonths(ts, n) {
 }
 
 export function useClients() {
-    const [clients,          setClients]          = useState([]);
+    // ── Lista paginada ──────────────────────────────────────────────────────
+    const [clients,      setClients]      = useState([]);  // página atual (com pedidos)
+    const [allClients,   setAllClients]   = useState([]);  // todos (sem filtro) — para totais
+    const [page,         setPage]         = useState(1);
+    const [totalPages,   setTotalPages]   = useState(1);
+    const [totalItems,   setTotalItems]   = useState(0);
+
     const [userProducts,     setUserProducts]     = useState([]);
     const [expandedClientId, setExpandedClientId] = useState(null);
     const [expandedOrderId,  setExpandedOrderId]  = useState(null);
@@ -65,11 +73,18 @@ export function useClients() {
     const [searchQuery,   setSearchQuery]   = useState("");
     const [searchVisible, setSearchVisible] = useState(false);
 
-    // Filtro de pedidos pagos/finalizados
+    // Filtro de pedidos finalizados
     const [showCompleted, setShowCompleted] = useState(false);
 
+    // Debounce da busca
+    const searchTimer = useRef(null);
+
+    // Refs para evitar stale closure nas callbacks assíncronas
+    const searchQueryRef   = useRef("");
+    const showCompletedRef = useRef(false);
+    const pageRef          = useRef(1);
+
     // ── Modais de confirmação ─────────────────────────────────────────────────
-    // Cada um guarda { visible, clientId?, orderId?, installmentId?, ... }
     const [confirmDeleteClient,        setConfirmDeleteClient]        = useState({ visible: false, client: null });
     const [confirmCancelOrder,         setConfirmCancelOrder]         = useState({ visible: false, clientId: null, orderId: null });
     const [confirmDeleteOrder,         setConfirmDeleteOrder]         = useState({ visible: false, clientId: null, orderId: null });
@@ -85,15 +100,92 @@ export function useClients() {
     useFocusEffect(
         useCallback(() => {
             initDatabase();
-            loadData();
+            loadTotals();
+            loadPage(1, "", false);
+            loadProducts();
         }, [])
     );
 
-    const loadData = async () => {
+    /** Carrega TODOS os clientes (sem filtro/paginação) apenas para calcular totais. */
+    const loadTotals = async () => {
         const user = await getSession();
         if (!user) return;
-        setClients(getClients(user.id).sort((a, b) => b.createdAt - a.createdAt));
+        setAllClients(getClients(user.id));
+    };
+
+    const loadProducts = async () => {
+        const user = await getSession();
+        if (!user) return;
         setUserProducts(getProducts(user.id));
+    };
+
+    /**
+     * Carrega uma página de clientes do banco.
+     * @param {number} targetPage
+     * @param {string} query
+     * @param {boolean} completed
+     */
+    const loadPage = async (targetPage, query, completed) => {
+        const user = await getSession();
+        if (!user) return;
+        const { items, total, totalPages: tp } = getClientsPaged(
+            user.id, targetPage, query, completed
+        );
+        setClients(items);
+        setPage(targetPage);
+        setTotalItems(total);
+        setTotalPages(tp);
+        // Mantém refs sincronizadas para evitar stale closures
+        pageRef.current          = targetPage;
+        searchQueryRef.current   = query;
+        showCompletedRef.current = completed;
+    };
+
+    // helper interno — lê sempre os valores atuais via refs (sem stale closure)
+    const reload = (targetPage) =>
+        loadPage(
+            targetPage ?? pageRef.current,
+            searchQueryRef.current,
+            showCompletedRef.current,
+        );
+
+    // ── Controles de página ───────────────────────────────────────────────────
+
+    const goToPage = (p) => {
+        const clamped = Math.max(1, Math.min(p, totalPages));
+        reload(clamped);
+    };
+
+    const goNext = () => goToPage(page + 1);
+    const goPrev = () => goToPage(page - 1);
+
+    // ── Busca com debounce ────────────────────────────────────────────────────
+
+    const handleSearchChange = (text) => {
+        setSearchQuery(text);
+        searchQueryRef.current = text;
+        clearTimeout(searchTimer.current);
+        searchTimer.current = setTimeout(() => {
+            loadPage(1, text, showCompletedRef.current);
+        }, 300);
+    };
+
+    const toggleSearch = () => {
+        setSearchVisible((v) => {
+            if (v) {
+                setSearchQuery("");
+                searchQueryRef.current = "";
+                loadPage(1, "", showCompletedRef.current);
+            }
+            return !v;
+        });
+    };
+
+    // Quando alterna entre pedidos ativos ↔ finalizados, volta à página 1
+    const handleSetShowCompleted = (val) => {
+        setShowCompleted(val);
+        showCompletedRef.current = val;
+        loadPage(1, searchQueryRef.current, val);
     };
 
     // ── CRUD Clientes ─────────────────────────────────────────────────────────
@@ -142,16 +234,20 @@ export function useClients() {
                 }
         );
         closeClientModal();
-        loadData();
+        loadTotals();
+        const targetPage = editingClient ? page : 1;
+        loadPage(targetPage, searchQueryRef.current, showCompletedRef.current);
     };
 
-    // Abre o modal de confirmação — a ação real fica em _doDeleteClient
     const handleDeleteClient = (client) =>
         setConfirmDeleteClient({ visible: true, client });
 
     const _doDeleteClient = () => {
         deleteClient(confirmDeleteClient.client.clientId);
-        loadData();
+        loadTotals();
+        const newTotal = totalItems - 1;
+        const maxPage  = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
+        reload(Math.min(page, maxPage));
     };
 
     // ── Novo pedido ───────────────────────────────────────────────────────────
@@ -194,30 +290,36 @@ export function useClients() {
 
         const user = await getSession();
         if (!user) return;
-        const products = getProducts(user.id);
-
-        for (let i = 0; i < orderItems.length; i++) {
-            const { productId, quantity } = orderItems[i];
-            const qty  = parseInt(quantity, 10);
-            const prod = products.find((p) => p.productId === productId);
-            if (!prod) { handleMessage(false, "Erro", `Produto do item ${i + 1} não encontrado.`); return; }
-            if (prod.quantity < qty) {
-                handleMessage(false, "Estoque insuficiente", `Item ${i + 1}: disponível ${prod.quantity} un. de "${prod.name}".`);
-                return;
-            }
-        }
 
         const now = Date.now();
-        for (let i = 0; i < orderItems.length; i++) {
-            const item  = orderItems[i];
-            const qty   = parseInt(item.quantity, 10);
-            const inst  = parseInt(item.installments, 10);
-            const prod  = products.find((p) => p.productId === item.productId);
-            const total = prod.price * qty;
 
-            updateProductQuantity(prod.productId, prod.quantity - qty);
-            insertOrder({
-                orderId:    `ord_${now}_${i}_${Math.random().toString(36).slice(2)}`,
+        for (const item of orderItems) {
+            const prod = userProducts.find((p) => p.productId === item.productId);
+            if (!prod) continue;
+            const qty  = parseInt(item.quantity, 10);
+            const inst = item.aVista ? 1 : parseInt(item.installments, 10);
+
+            if (qty > prod.quantity) {
+                handleMessage(false, "Estoque insuficiente", `Disponível: ${prod.quantity} un. de "${prod.name}".`);
+                return;
+            }
+
+            const total = prod.price * qty;
+            const installmentValue = parseFloat((total / inst).toFixed(2));
+
+            const installmentsList = Array.from({ length: inst }, (_, idx) => ({
+                installmentId: `inst_${now}_${idx}_${Math.random().toString(36).slice(2)}`,
+                index:         idx + 1,
+                value:         idx === inst - 1
+                    ? parseFloat((total - installmentValue * (inst - 1)).toFixed(2))
+                    : installmentValue,
+                dueDate: orderFirstDueDate
+                    ? addMonths(orderFirstDueDate, idx)
+                    : null,
+            }));
+
+            const order = {
+                orderId:    `ord_${now}_${Math.random().toString(36).slice(2)}`,
                 clientId:   selectedClientId,
                 userId:     user.id,
                 totalValue: total,
@@ -226,27 +328,26 @@ export function useClients() {
                 productRef: prod.name,
                 productId:  prod.productId,
                 createdAt:  now,
-                installments: item.aVista
-                    ? []
-                    : Array.from({ length: inst }, (_, j) => ({
-                        installmentId: `inst_${now}_${i}_${j}`,
-                        index:   j + 1,
-                        value:   total / inst,
-                        dueDate: orderFirstDueDate ? addMonths(orderFirstDueDate, j) : null,
-                    })),
-            });
+                installments: installmentsList,
+            };
+
+            insertOrder(order);
+            updateProductQuantity(prod.productId, prod.quantity - qty);
         }
+
         closeOrderModal();
-        loadData();
+        loadTotals();
+        reload();
+        loadProducts();
     };
 
     // ── Editar pedido ─────────────────────────────────────────────────────────
 
     const openEditOrder = (clientId, order) => {
-        const clientObj = clients.find((c) => c.clientId === clientId) ?? null;
         setEditingClientId(clientId);
-        setEditingClientObj(clientObj);
         setEditingOrder(order);
+        const client = clients.find((c) => c.clientId === clientId);
+        setEditingClientObj(client ?? null);
         setEditOrderModal(true);
     };
 
@@ -257,78 +358,51 @@ export function useClients() {
         setEditingClientObj(null);
     };
 
-    const handleSaveEditedOrder = (updatedOrder, stockDeltas) => {
-        for (const { productId, delta } of stockDeltas) {
-            const prod = userProducts.find((p) => p.productId === productId);
-            if (prod) updateProductQuantity(productId, prod.quantity + delta);
-        }
-
+    const handleSaveEditedOrder = (updatedOrder) => {
+        if (!updatedOrder) return;
         updateOrderCore(updatedOrder.orderId, {
             totalValue: updatedOrder.totalValue,
             quantity:   updatedOrder.quantity,
             productRef: updatedOrder.productRef,
             productId:  updatedOrder.productId,
         });
-
-        const originalIds = new Set((editingOrder?.installments || []).map((i) => i.installmentId));
-        const updatedIds  = new Set(updatedOrder.installments.map((i) => i.installmentId));
-
-        for (const id of originalIds) {
-            if (!updatedIds.has(id)) deleteInstallment(id);
-        }
-
         for (const inst of updatedOrder.installments) {
-            if (originalIds.has(inst.installmentId)) {
-                updateInstallmentDueDate(inst.installmentId, inst.dueDate ?? null);
-                if (!inst.paid) updateInstallmentValue(inst.installmentId, inst.value);
-            } else {
-                insertInstallment({
-                    installmentId: inst.installmentId,
-                    orderId:       updatedOrder.orderId,
-                    index:         inst.index,
-                    value:         inst.value,
-                    dueDate:       inst.dueDate ?? null,
-                });
-            }
+            updateInstallmentValue(inst.installmentId, inst.value);
+            updateInstallmentDueDate(inst.installmentId, inst.dueDate ?? null);
         }
-
-        reindexInstallments(updatedOrder.orderId);
         closeEditOrderModal();
-        loadData();
+        loadTotals();
+        reload();
     };
 
-    // ── Cancelar / excluir / recuperar pedido ─────────────────────────────────
+    // ── Ações de pedido ───────────────────────────────────────────────────────
 
     const handleCancelOrder = (clientId, orderId) =>
         setConfirmCancelOrder({ visible: true, clientId, orderId });
 
     const _doCancelOrder = () => {
         const { clientId, orderId } = confirmCancelOrder;
-        const client = clients.find((c) => c.clientId === clientId);
+        const client = clients.find((c) => c.clientId === clientId)
+            ?? allClients.find((c) => c.clientId === clientId);
         const order  = client?.orders?.find((o) => o.orderId === orderId);
         if (order?.productId && order?.quantity) {
             const prod = userProducts.find((p) => p.productId === order.productId);
             if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
         }
         updateOrderStatus(orderId, "cancelled");
-        closeEditOrderModal();
-        loadData();
+        loadTotals();
+        reload();
+        loadProducts();
     };
 
     const handleDeleteOrder = (clientId, orderId) =>
         setConfirmDeleteOrder({ visible: true, clientId, orderId });
 
     const _doDeleteOrder = () => {
-        const { clientId, orderId } = confirmDeleteOrder;
-        const client = clients.find((c) => c.clientId === clientId);
-        const order  = client?.orders?.find((o) => o.orderId === orderId);
-        if (order?.productId && order?.quantity) {
-            const prod = userProducts.find((p) => p.productId === order.productId);
-            if (prod) updateProductQuantity(prod.productId, prod.quantity + order.quantity);
-        }
+        const { orderId } = confirmDeleteOrder;
         deleteOrder(orderId);
-        closeEditOrderModal();
-        loadData();
+        loadTotals();
+        reload();
     };
 
     const handleRecoverOrder = (clientId, orderId) =>
@@ -336,7 +410,8 @@ export function useClients() {
 
     const _doRecoverOrder = () => {
         const { clientId, orderId } = confirmRecoverOrder;
-        const client = clients.find((c) => c.clientId === clientId);
+        const client = clients.find((c) => c.clientId === clientId)
+            ?? allClients.find((c) => c.clientId === clientId);
         const order  = client?.orders?.find((o) => o.orderId === orderId);
         if (order?.productId && order?.quantity) {
             const prod = userProducts.find((p) => p.productId === order.productId);
@@ -353,7 +428,9 @@ export function useClients() {
             }
         }
         updateOrderStatus(orderId, "active");
-        loadData();
+        loadTotals();
+        reload();
+        loadProducts();
     };
 
     const handleCompleteOrder = (clientId, orderId) =>
@@ -362,7 +439,8 @@ export function useClients() {
     const _doCompleteOrder = (orderId) => {
         const id = orderId ?? confirmCompleteOrder.orderId;
         updateOrderStatus(id, "completed");
-        loadData();
+        loadTotals();
+        reload();
     };
 
     const handleDeleteCancelledOrder = (clientId, orderId) =>
@@ -370,7 +448,8 @@ export function useClients() {
 
     const _doDeleteCancelledOrder = () => {
         deleteOrder(confirmDeleteCancelled.orderId);
-        loadData();
+        loadTotals();
+        reload();
     };
 
     // ── Parcelas ──────────────────────────────────────────────────────────────
@@ -388,13 +467,16 @@ export function useClients() {
                 (i) => i.installmentId === installmentId ? true : i.paid
             );
             if (allPaid && order.installments.length > 0) {
-                loadData();
+                loadTotals();
+                reload();
                 setConfirmAllPaidComplete({ visible: true, orderId });
             } else {
-                loadData();
+                loadTotals();
+                reload();
             }
         } else {
-            loadData();
+            loadTotals();
+            reload();
         }
     };
 
@@ -403,7 +485,8 @@ export function useClients() {
 
     const _doUnpayInstallment = () => {
         setInstallmentPaid(confirmUnpayInstallment.installmentId, false);
-        loadData();
+        loadTotals();
+        reload();
     };
 
     const openAddInstallment = (orderId) => {
@@ -431,7 +514,8 @@ export function useClients() {
         updateOrderTotalValue(selectedOrderId, order.totalValue + value);
         setAddInstallmentModal(false);
         setSelectedOrderId(null);
-        loadData();
+        loadTotals();
+        reload();
     };
 
     // ── Expand ────────────────────────────────────────────────────────────────
@@ -439,36 +523,13 @@ export function useClients() {
     const toggleClient = (id) => setExpandedClientId((p) => (p === id ? null : id));
     const toggleOrder  = (id) => setExpandedOrderId((p)  => (p === id ? null : id));
 
-    // ── Busca ─────────────────────────────────────────────────────────────────
+    // ── Derivados (sobre allClients — dados completos) ────────────────────────
 
-    const toggleSearch = () =>
-        setSearchVisible((v) => { if (v) setSearchQuery(""); return !v; });
-
-    const filteredClients = (() => {
-        let base = searchQuery.trim()
-            ? clients.filter(
-                (c) =>
-                    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    (c.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    (c.phone || "").includes(searchQuery)
-            )
-            : clients;
-
-        return base.map((c) => ({
-            ...c,
-            orders: (c.orders || []).filter((o) =>
-                showCompleted ? o.status === "completed" : o.status !== "completed"
-            ),
-        })).filter((c) => (showCompleted ? c.orders.length > 0 : true));
-    })();
-
-    // ── Derivados ─────────────────────────────────────────────────────────────
-
-    const totalClients      = clients.length;
-    const totalActiveOrders = clients.reduce(
+    const totalClients      = allClients.length;
+    const totalActiveOrders = allClients.reduce(
         (acc, c) => acc + (c.orders || []).filter((o) => o.status === "active").length, 0
     );
-    const totalPending = clients.reduce(
+    const totalPending = allClients.reduce(
         (acc, c) =>
             acc +
             (c.orders || [])
@@ -479,23 +540,35 @@ export function useClients() {
                 ),
         0
     );
-    const totalCompleted = clients.reduce(
+    const totalCompleted = allClients.reduce(
         (acc, c) => acc + (c.orders || []).filter((o) => o.status === "completed").length, 0
     );
 
+    // Filtra os pedidos dentro de cada cliente da página conforme showCompleted
+    const clientsForDisplay = clients.map((c) => ({
+        ...c,
+        orders: (c.orders || []).filter((o) =>
+            showCompleted ? o.status === "completed" : o.status !== "completed"
+        ),
+    }));
+
     return {
-        clients: filteredClients,
-        allClients: clients,
+        clients: clientsForDisplay,
+        allClients,
         userProducts,
         expandedClientId,
         expandedOrderId,
+        // paginação
+        page, totalPages, totalItems,
+        pageSize: PAGE_SIZE,
+        goNext, goPrev, goToPage,
         totalClients,
         totalActiveOrders,
         totalPending,
         totalCompleted,
-        searchQuery, setSearchQuery,
+        searchQuery, handleSearchChange, setSearchQuery,
         searchVisible, toggleSearch,
-        showCompleted, setShowCompleted,
+        showCompleted, setShowCompleted: handleSetShowCompleted,
         // modal cliente
         clientModal, editingClient, clientForm, setClientForm,
         openCreateClient, openEditClient, closeClientModal, handleSaveClient, handleDeleteClient,
@@ -515,14 +588,14 @@ export function useClients() {
         handleCompleteOrder,
         handleRecoverOrder, handleDeleteCancelledOrder,
         toggleClient, toggleOrder,
-        // estados dos modais de confirmação (consumidos pela ClientsScreen)
-        confirmDeleteClient,   setConfirmDeleteClient,   _doDeleteClient,
-        confirmCancelOrder,    setConfirmCancelOrder,    _doCancelOrder,
-        confirmDeleteOrder,    setConfirmDeleteOrder,    _doDeleteOrder,
-        confirmRecoverOrder,   setConfirmRecoverOrder,   _doRecoverOrder,
-        confirmCompleteOrder,  setConfirmCompleteOrder,  _doCompleteOrder,
-        confirmDeleteCancelled,setConfirmDeleteCancelled,_doDeleteCancelledOrder,
-        confirmPayInstallment, setConfirmPayInstallment, _doPayInstallment,
+        // confirmações
+        confirmDeleteClient,    setConfirmDeleteClient,    _doDeleteClient,
+        confirmCancelOrder,     setConfirmCancelOrder,     _doCancelOrder,
+        confirmDeleteOrder,     setConfirmDeleteOrder,     _doDeleteOrder,
+        confirmRecoverOrder,    setConfirmRecoverOrder,    _doRecoverOrder,
+        confirmCompleteOrder,   setConfirmCompleteOrder,   _doCompleteOrder,
+        confirmDeleteCancelled, setConfirmDeleteCancelled, _doDeleteCancelledOrder,
+        confirmPayInstallment,  setConfirmPayInstallment,  _doPayInstallment,
         confirmUnpayInstallment,setConfirmUnpayInstallment,_doUnpayInstallment,
         confirmAllPaidComplete, setConfirmAllPaidComplete,
     };

@@ -1,6 +1,8 @@
 import { View, FlatList, TouchableOpacity, TextInput } from "react-native";
+import { useRef } from "react";
 import { Text } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
+import { useCallback } from "react";
 import { useTheme } from "../../../components/ThemeContext";
 import { toCurrencyDisplay } from "../shared/helpers";
 import { useClients } from "./useClients";
@@ -10,6 +12,7 @@ import { OrderModal } from "./OrderModal";
 import { EditOrderModal } from "./EditOrderModal";
 import { AddInstallmentModal } from "./AddInstallmentModal";
 import { ConfirmModal } from "../../../components/general/ConfirmModal";
+import { Pagination } from "../../../components/general/Pagination";
 import { styles } from "./clients.styles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -17,12 +20,14 @@ export default function ClientsScreen() {
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
   const insets = useSafeAreaInsets();
+  const flatListRef = useRef(null);
 
   const {
     clients, allClients, userProducts,
     expandedClientId, expandedOrderId,
+    page, totalPages, totalItems, pageSize, goNext, goPrev,
     totalClients, totalActiveOrders, totalPending, totalCompleted,
-    searchQuery, setSearchQuery, searchVisible, toggleSearch,
+    searchQuery, handleSearchChange, setSearchQuery, searchVisible, toggleSearch,
     showCompleted, setShowCompleted,
     clientModal, editingClient, clientForm, setClientForm,
     openCreateClient, openEditClient, closeClientModal, handleSaveClient, handleDeleteClient,
@@ -49,6 +54,42 @@ export default function ClientsScreen() {
     confirmUnpayInstallment,setConfirmUnpayInstallment,_doUnpayInstallment,
     confirmAllPaidComplete, setConfirmAllPaidComplete,
   } = useClients();
+
+  const handleToggleSearch = () => {
+    toggleSearch();
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  // ── Callbacks estáveis — evitam invalidar o memo dos cards ────────────────
+  const keyExtractor = useCallback((item) => item.clientId, []);
+
+  const renderItem = useCallback(({ item: client }) => (
+    <ClientCard
+      client={client}
+      isExpanded={expandedClientId === client.clientId}
+      expandedOrderId={expandedOrderId}
+      onToggleClient={toggleClient}
+      onToggleOrder={toggleOrder}
+      onNewOrder={openCreateOrder}
+      onEditClient={openEditClient}
+      onDeleteClient={handleDeleteClient}
+      onPayInstallment={handlePayInstallment}
+      onUnpayInstallment={handleUnpayInstallment}
+      onEditOrder={openEditOrder}
+      onCancelOrder={handleCancelOrder}
+      onCompleteOrder={handleCompleteOrder}
+      onRecoverOrder={handleRecoverOrder}
+      onDeleteCancelledOrder={handleDeleteCancelledOrder}
+      showCompleted={showCompleted}
+      colors={colors}
+    />
+  ), [
+    expandedClientId, expandedOrderId, showCompleted, colors,
+    toggleClient, toggleOrder, openCreateOrder, openEditClient,
+    handleDeleteClient, handlePayInstallment, handleUnpayInstallment,
+    openEditOrder, handleCancelOrder, handleCompleteOrder,
+    handleRecoverOrder, handleDeleteCancelledOrder,
+  ]);
 
   const ListHeader = (
     <>
@@ -80,7 +121,7 @@ export default function ClientsScreen() {
       </View>
 
       <TouchableOpacity
-        onPress={() => setShowCompleted((v) => !v)}
+        onPress={() => setShowCompleted(!showCompleted)}
         style={[
           styles.filterToggle,
           {
@@ -117,18 +158,30 @@ export default function ClientsScreen() {
             placeholder="Buscar por nome, email, telefone..."
             placeholderTextColor={colors.text + "66"}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearchChange}
             autoFocus
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <TouchableOpacity onPress={() => { setSearchQuery(""); handleSearchChange(""); }}>
               <FontAwesome6 name="xmark" size={14} color={colors.text} style={{ opacity: 0.5 }} />
             </TouchableOpacity>
           )}
         </View>
       )}
     </>
+  );
+
+  const ListFooter = (
+    <Pagination
+      page={page}
+      totalPages={totalPages}
+      totalItems={totalItems}
+      pageSize={pageSize}
+      onNext={goNext}
+      onPrev={goPrev}
+      colors={colors}
+    />
   );
 
   const ListEmpty = (
@@ -152,39 +205,22 @@ export default function ClientsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <FlatList
+        ref={flatListRef}
         data={clients}
-        keyExtractor={(item) => item.clientId}
-        contentContainerStyle={styles.container}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={[styles.container, { paddingBottom: 120 }]}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
-        ListFooterComponent={<View style={{ height: 100 }} />}
-        renderItem={({ item: client }) => (
-          <ClientCard
-            client={client}
-            isExpanded={expandedClientId === client.clientId}
-            expandedOrderId={expandedOrderId}
-            onToggleClient={toggleClient}
-            onToggleOrder={toggleOrder}
-            onNewOrder={openCreateOrder}
-            onEditClient={openEditClient}
-            onDeleteClient={handleDeleteClient}
-            onPayInstallment={handlePayInstallment}
-            onUnpayInstallment={handleUnpayInstallment}
-            onEditOrder={openEditOrder}
-            onCancelOrder={handleCancelOrder}
-            onCompleteOrder={handleCompleteOrder}
-            onRecoverOrder={handleRecoverOrder}
-            onDeleteCancelledOrder={handleDeleteCancelledOrder}
-            showCompleted={showCompleted}
-            colors={colors}
-          />
-        )}
+        ListFooterComponent={ListFooter}
+        renderItem={renderItem}
       />
 
-      <View style={styles.fabRow}>
+      <View style={[styles.fabRow, { backgroundColor: colors.background + "F0" }]}
+        pointerEvents="box-none"
+      >
         <TouchableOpacity
           style={[styles.fabSecondary, { backgroundColor: searchVisible ? colors.mediumRed : colors.card }]}
-          onPress={toggleSearch}
+          onPress={handleToggleSearch}
           activeOpacity={0.85}
         >
           <FontAwesome6 name="magnifying-glass" size={18} color={searchVisible ? "#fff" : colors.mediumRed} />
@@ -328,7 +364,6 @@ export default function ClientsScreen() {
         onConfirm={_doUnpayInstallment}
         onClose={() => setConfirmUnpayInstallment({ visible: false, clientId: null, orderId: null, installmentId: null })}
       />
-      {/* Modal especial: todas as parcelas pagas → oferecer finalizar */}
       <ConfirmModal
         visible={confirmAllPaidComplete.visible}
         title="Pedido concluído!"

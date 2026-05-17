@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { formatCurrency, parseCurrency } from "../shared/helpers";
 import { getSession } from "../../../functions/shared/secureStorage";
@@ -6,10 +6,12 @@ import { handleMessage } from "../../../components/general/ToastMessage";
 import {
     initDatabase,
     getProducts,
+    getProductsPaged,
     upsertProduct,
     deleteProduct,
 } from "../shared/database";
 
+const PAGE_SIZE  = 30;
 const EMPTY_FORM = { name: "", quantity: "", price: "", description: "", category: "Outros", imageUri: "" };
 
 export const PRODUCT_CATEGORIES = [
@@ -32,31 +34,89 @@ export const PRODUCT_CATEGORIES = [
 ];
 
 export function useProducts() {
-    const [products,      setProducts]      = useState([]);
-    const [modalVisible,  setModalVisible]  = useState(false);
-    const [editingProduct,setEditingProduct]= useState(null);
-    const [form,          setForm]          = useState(EMPTY_FORM);
-    const [expandedId,    setExpandedId]    = useState(null);
+    // ── Lista paginada ──────────────────────────────────────────────────────
+    const [products,    setProducts]    = useState([]);   // página atual
+    const [allProducts, setAllProducts] = useState([]);   // sem filtro (para totais)
+    const [page,        setPage]        = useState(1);
+    const [totalPages,  setTotalPages]  = useState(1);
+    const [totalItems,  setTotalItems]  = useState(0);
+
+    // ── Form / modais ───────────────────────────────────────────────────────
+    const [modalVisible,   setModalVisible]   = useState(false);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [form,           setForm]           = useState(EMPTY_FORM);
+    const [expandedId,     setExpandedId]     = useState(null);
+
+    // ── Busca ───────────────────────────────────────────────────────────────
     const [searchQuery,   setSearchQuery]   = useState("");
     const [searchVisible, setSearchVisible] = useState(false);
 
-    // Modal de confirmação de exclusão
+    // ── Confirmação de exclusão ──────────────────────────────────────────────
     const [confirmDelete, setConfirmDelete] = useState({ visible: false, product: null });
+
+    // Debounce da busca
+    const searchTimer = useRef(null);
 
     // ── Carregar ─────────────────────────────────────────────────────────────
 
     useFocusEffect(
         useCallback(() => {
             initDatabase();
-            loadProducts();
+            loadTotals();
+            loadPage(1, "");
         }, [])
     );
 
-    const loadProducts = async () => {
+    /** Carrega todos os produtos SEM filtro apenas para calcular totais do header. */
+    const loadTotals = async () => {
         const user = await getSession();
         if (!user) return;
-        const list = getProducts(user.id);
-        setProducts(list);
+        setAllProducts(getProducts(user.id));
+    };
+
+    /**
+     * Carrega uma página específica do banco.
+     * @param {number} targetPage — 1-based
+     * @param {string} query
+     */
+    const loadPage = async (targetPage, query) => {
+        const user = await getSession();
+        if (!user) return;
+        const { items, total, totalPages: tp } = getProductsPaged(user.id, targetPage, query);
+        setProducts(items);
+        setPage(targetPage);
+        setTotalItems(total);
+        setTotalPages(tp);
+    };
+
+    // ── Controles de página ───────────────────────────────────────────────────
+
+    const goToPage = (p) => {
+        const clamped = Math.max(1, Math.min(p, totalPages));
+        loadPage(clamped, searchQuery);
+    };
+
+    const goNext = () => goToPage(page + 1);
+    const goPrev = () => goToPage(page - 1);
+
+    // ── Busca com debounce ────────────────────────────────────────────────────
+
+    const handleSearchChange = (text) => {
+        setSearchQuery(text);
+        clearTimeout(searchTimer.current);
+        searchTimer.current = setTimeout(() => {
+            loadPage(1, text);
+        }, 300);
+    };
+
+    const toggleSearch = () => {
+        setSearchVisible((v) => {
+            if (v) {
+                setSearchQuery("");
+                loadPage(1, "");
+            }
+            return !v;
+        });
     };
 
     // ── Modal ─────────────────────────────────────────────────────────────────
@@ -132,16 +192,24 @@ export function useProducts() {
 
         upsertProduct(product);
         closeModal();
-        loadProducts();
+        // Ao criar, volta à página 1; ao editar, mantém a página atual
+        const targetPage = editingProduct ? page : 1;
+        loadTotals();
+        loadPage(targetPage, searchQuery);
     };
 
-    // Abre modal de confirmação — a ação real fica em _doDelete
+    /** Abre modal de confirmação — a ação real fica em _doDelete */
     const handleDelete = (product) =>
         setConfirmDelete({ visible: true, product });
 
     const _doDelete = () => {
         deleteProduct(confirmDelete.product.productId);
-        loadProducts();
+        loadTotals();
+        // Se era o último item da página, recua uma página
+        const newTotal = totalItems - 1;
+        const maxPage  = Math.max(1, Math.ceil(newTotal / PAGE_SIZE));
+        const target   = Math.min(page, maxPage);
+        loadPage(target, searchQuery);
     };
 
     // ── Expand ────────────────────────────────────────────────────────────────
@@ -149,32 +217,21 @@ export function useProducts() {
     const toggleExpand = (productId) =>
         setExpandedId((prev) => (prev === productId ? null : productId));
 
-    // ── Busca ─────────────────────────────────────────────────────────────────
-
-    const toggleSearch = () => {
-        setSearchVisible((v) => {
-            if (v) setSearchQuery("");
-            return !v;
-        });
-    };
-
-    const filteredProducts = searchQuery.trim()
-        ? products.filter(
-            (p) =>
-                p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (p.category || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (p.description || "").toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        : products;
-
     // ── Derivados ─────────────────────────────────────────────────────────────
 
-    const totalStock = products.reduce((acc, p) => acc + p.quantity, 0);
-    const totalValue = products.reduce((acc, p) => acc + p.price * p.quantity, 0);
+    const totalStock = allProducts.reduce((acc, p) => acc + p.quantity, 0);
+    const totalValue = allProducts.reduce((acc, p) => acc + p.price * p.quantity, 0);
 
     return {
-        products: filteredProducts,
-        allProducts: products,
+        products,           // página atual (já filtrada/paginada)
+        allProducts,        // todos (sem filtro) — para os cards de resumo
+        page,
+        totalPages,
+        totalItems,
+        pageSize: PAGE_SIZE,
+        goNext,
+        goPrev,
+        goToPage,
         modalVisible,
         editingProduct,
         form,
@@ -183,7 +240,8 @@ export function useProducts() {
         totalStock,
         totalValue,
         searchQuery,
-        setSearchQuery,
+        handleSearchChange,  // usa debounce interno
+        setSearchQuery,      // expõe para limpar manualmente
         searchVisible,
         toggleSearch,
         openCreateModal,

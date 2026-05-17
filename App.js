@@ -62,9 +62,7 @@ export default function Index() {
       } catch (error) {
         handleMessage(false, "Ocorreu um erro", "Erro ao carregar os dados do usuário: " + error);
       } finally {
-        const timer = setTimeout(() => {
-          setAppLoaded(true);
-        }, 2000);
+        setAppLoaded(true);
 
         await SplashScreen.hideAsync();
       }

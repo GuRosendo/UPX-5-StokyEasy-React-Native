@@ -149,7 +149,7 @@ export function useProfile() {
       const updated = {
         ...user,
         fullName:  form.fullName.trim(),
-        email:     form.email.trim(),
+        email:     form.email.trim().toLowerCase(),
         phone:     digitsOnly(form.phone),
         birthDate: form.birthDate ? tsToISO(form.birthDate) : user.birthDate,
         gender:    form.gender || user.gender,

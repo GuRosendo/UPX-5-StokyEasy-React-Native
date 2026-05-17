@@ -78,12 +78,12 @@ const Login = ({ navigation, route }) => {
                         onSubmit={(values, { setSubmitting }) => {
                             setSubmitting(true);
 
-                            setTimeout(async () => {
+                            async () => {
                                 if (await handleLogin(values)) {
                                     await persistLogin(values, setStoredData);
                                 }
                                 setSubmitting(false);
-                            }, 1000);
+                            }
                         }}
                     >
                         {({ handleChange, handleBlur, handleSubmit, isSubmitting, values }) => (

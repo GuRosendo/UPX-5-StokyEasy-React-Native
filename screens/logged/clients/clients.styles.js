@@ -92,11 +92,16 @@ export const styles = StyleSheet.create({
   // ── FABs ───────────────────────────────────────────────────────────────────
   fabRow: {
     position: "absolute",
-    bottom: 28,
-    right: 24,
+    bottom: 0,
+    right: 0,
+    left: 0,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     gap: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    paddingTop: 16,
   },
   fab: {
     width: 58, height: 58, borderRadius: 29,

@@ -1,4 +1,5 @@
 import { View, FlatList, TouchableOpacity, TextInput } from "react-native";
+import { useRef } from "react";
 import { Text } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { useTheme } from "../../../components/ThemeContext";
@@ -6,6 +7,7 @@ import { useProducts } from "./useProducts";
 import { ProductCard } from "./ProductCard";
 import { ProductModal } from "./ProductModal";
 import { ConfirmModal } from "../../../components/general/ConfirmModal";
+import { Pagination } from "../../../components/general/Pagination";
 import { styles } from "./products.styles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -13,15 +15,24 @@ export default function ProductsScreen() {
   const { theme, themeColors } = useTheme();
   const colors = themeColors[theme];
   const insets = useSafeAreaInsets();
+  const flatListRef = useRef(null);
 
   const {
     products, allProducts,
+    page, totalPages, totalItems, pageSize,
+    goNext, goPrev,
     modalVisible, editingProduct, form, setForm,
     expandedId, totalStock, totalValue,
-    searchQuery, setSearchQuery, searchVisible, toggleSearch,
+    searchQuery, handleSearchChange, setSearchQuery, searchVisible, toggleSearch,
     openCreateModal, openEditModal, closeModal, handleSave, handleDelete, toggleExpand,
     confirmDelete, setConfirmDelete, _doDelete,
   } = useProducts();
+
+  const handleToggleSearch = () => {
+    toggleSearch();
+    // Sobe até o topo para o campo de busca ficar visível
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
 
   const ListHeader = (
     <>
@@ -57,18 +68,30 @@ export default function ProductsScreen() {
             placeholder="Buscar por nome, categoria..."
             placeholderTextColor={colors.text + "66"}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearchChange}
             autoFocus
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <TouchableOpacity onPress={() => { setSearchQuery(""); handleSearchChange(""); }}>
               <FontAwesome6 name="xmark" size={14} color={colors.text} style={{ opacity: 0.5 }} />
             </TouchableOpacity>
           )}
         </View>
       )}
     </>
+  );
+
+  const ListFooter = (
+    <Pagination
+      page={page}
+      totalPages={totalPages}
+      totalItems={totalItems}
+      pageSize={pageSize}
+      onNext={goNext}
+      onPrev={goPrev}
+      colors={colors}
+    />
   );
 
   const ListEmpty = (
@@ -83,12 +106,13 @@ export default function ProductsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       <FlatList
+        ref={flatListRef}
         data={products}
         keyExtractor={(item) => item.productId}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: 120 }]}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
-        ListFooterComponent={<View style={{ height: 100 }} />}
+        ListFooterComponent={products.length > 0 ? ListFooter : null}
         renderItem={({ item }) => (
           <ProductCard
             product={item}
@@ -101,10 +125,12 @@ export default function ProductsScreen() {
         )}
       />
 
-      <View style={styles.fabRow}>
+      <View style={[styles.fabRow, { backgroundColor: colors.background + "F0" }]}
+        pointerEvents="box-none"
+      >
         <TouchableOpacity
           style={[styles.fabSecondary, { backgroundColor: searchVisible ? colors.mediumRed : colors.card }]}
-          onPress={toggleSearch}
+          onPress={handleToggleSearch}
           activeOpacity={0.85}
         >
           <FontAwesome6 name="magnifying-glass" size={18} color={searchVisible ? "#fff" : colors.mediumRed} />

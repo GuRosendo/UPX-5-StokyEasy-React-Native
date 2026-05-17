@@ -30,16 +30,20 @@ export const getUsers = async () => {
 };
 
 export const saveUser = async (user) => {
+    // Garante que o email seja sempre salvo em lowercase
+    const normalized = { ...user, email: user.email ? user.email.toLowerCase().trim() : user.email };
     const ids = await getUserIds();
-    if (!ids.includes(user.id)) {
-        ids.push(user.id);
+    if (!ids.includes(normalized.id)) {
+        ids.push(normalized.id);
         await setUserIds(ids);
     }
-    await SecureStore.setItemAsync(`user_${user.id}`, JSON.stringify(user));
+    await SecureStore.setItemAsync(`user_${normalized.id}`, JSON.stringify(normalized));
 };
 
 export const updateUser = async (updatedUser) => {
-    await SecureStore.setItemAsync(`user_${updatedUser.id}`, JSON.stringify(updatedUser));
+    // Garante que o email seja sempre salvo em lowercase
+    const normalized = { ...updatedUser, email: updatedUser.email ? updatedUser.email.toLowerCase().trim() : updatedUser.email };
+    await SecureStore.setItemAsync(`user_${normalized.id}`, JSON.stringify(normalized));
 };
 
 export const getNextUserId = async () => {

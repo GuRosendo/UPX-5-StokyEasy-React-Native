@@ -2,19 +2,21 @@
  * ProductPickerModal
  *
  * Modal independente para selecionar um produto dentro de um item de pedido.
- * Usa o componente Input/Dropdown customizado do projeto — sem ScrollView aninhada
- * dentro de FlatList, eliminando o conflito de scroll.
+ * Paginação de 30 itens por página com busca via banco (LIMIT/OFFSET no SQLite).
  *
  * Props:
  *  visible        {boolean}
- *  products       {Array}   — lista de produtos com estoque > 0
+ *  userId         {string}  — id do usuário para consulta paginada
  *  selectedId     {string}  — productId já selecionado (para marcar no dropdown)
  *  onSelect       {fn}      — cb(productId) chamado ao confirmar
  *  onClose        {fn}
  *  colors         {object}  — themeColors do projeto
+ *
+ * Nota: a prop `products` ainda é aceita por compatibilidade mas não é usada
+ * internamente — a busca e paginação são feitas direto no banco.
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Modal,
@@ -27,40 +29,75 @@ import {
 import { Text, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
 import { Input } from "../../../components/general/Input";
+import { Pagination } from "../../../components/general/Pagination";
 import { toCurrencyDisplay } from "../shared/helpers";
+import { getAvailableProductsPaged } from "../shared/database";
+import { getSession } from "../../../functions/shared/secureStorage";
 import { styles } from "./clients.styles";
 
-export function ProductPickerModal({ visible, products, selectedId, onSelect, onClose, colors }) {
-  const [search, setSearch]         = useState("");
-  const [chosen, setChosen]         = useState(selectedId || null);
-  const [loading, setLoading]       = useState(false);
+const PAGE_SIZE = 30;
+
+export function ProductPickerModal({ visible, selectedId, onSelect, onClose, colors }) {
+  const [search,      setSearch]      = useState("");
+  const [chosen,      setChosen]      = useState(selectedId || null);
+  const [loading,     setLoading]     = useState(false);
+
+  // Dados paginados
+  const [items,       setItems]       = useState([]);
+  const [page,        setPage]        = useState(1);
+  const [totalPages,  setTotalPages]  = useState(1);
+  const [totalItems,  setTotalItems]  = useState(0);
+
+  const searchTimer = useRef(null);
+  const userIdRef   = useRef(null);
+
+  // Busca o userId uma vez e guarda na ref
+  useEffect(() => {
+    getSession().then((u) => { if (u) userIdRef.current = u.id; });
+  }, []);
 
   // Reseta estado ao abrir
   useEffect(() => {
     if (visible) {
       setChosen(selectedId || null);
       setSearch("");
-      setLoading(false);
+      setPage(1);
+      fetchPage(1, "");
     }
   }, [visible, selectedId]);
 
-  // Simula pequeno loading ao digitar para UX mais suave em listas grandes
-  useEffect(() => {
-    if (!visible) return;
+  const fetchPage = async (targetPage, query) => {
+    const userId = userIdRef.current;
+    if (!userId) {
+      // Tenta buscar sessão na hora (caso não tenha carregado ainda)
+      const u = await getSession();
+      if (!u) return;
+      userIdRef.current = u.id;
+    }
     setLoading(true);
-    const t = setTimeout(() => setLoading(false), 120);
-    return () => clearTimeout(t);
-  }, [search, visible]);
+    try {
+      const { items: rows, total, totalPages: tp } = getAvailableProductsPaged(
+        userIdRef.current, targetPage, query
+      );
+      setItems(rows);
+      setPage(targetPage);
+      setTotalItems(total);
+      setTotalPages(tp);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return products;
-    const q = search.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name?.toLowerCase().includes(q) ||
-        String(p.price).includes(q)
-    );
-  }, [search, products]);
+  const handleSearchChange = (text) => {
+    setSearch(text);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      fetchPage(1, text);
+    }, 300);
+  };
+
+  const goNext = () => fetchPage(Math.min(page + 1, totalPages), search);
+  const goPrev = () => fetchPage(Math.max(page - 1, 1), search);
 
   const handleConfirm = () => {
     if (!chosen) return;
@@ -93,6 +130,18 @@ export function ProductPickerModal({ visible, products, selectedId, onSelect, on
     );
   };
 
+  const ListFooter = (
+    <Pagination
+      page={page}
+      totalPages={totalPages}
+      totalItems={totalItems}
+      pageSize={PAGE_SIZE}
+      onNext={goNext}
+      onPrev={goPrev}
+      colors={colors}
+    />
+  );
+
   return (
     <Modal
       visible={visible}
@@ -111,7 +160,7 @@ export function ProductPickerModal({ visible, products, selectedId, onSelect, on
         <View
           style={[
             styles.modalBox,
-            { backgroundColor: colors.background, maxHeight: "70%" },
+            { backgroundColor: colors.background, maxHeight: "75%" },
           ]}
         >
           {/* Cabeçalho */}
@@ -124,20 +173,24 @@ export function ProductPickerModal({ visible, products, selectedId, onSelect, on
             </TouchableOpacity>
           </View>
 
-          {/* Campo de busca usando Input customizado */}
+          {/* Campo de busca */}
           <Input
             label="Buscar produto"
             icon="magnifying-glass"
-            placeholder="Nome ou valor..."
+            placeholder="Nome ou categoria..."
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
             returnKeyType="search"
             autoFocus={false}
             background={colors.card}
           />
 
           {/* Lista de produtos */}
-          {products.length === 0 ? (
+          {loading ? (
+            <View style={{ alignItems: "center", paddingVertical: 28 }}>
+              <ActivityIndicator size="small" color={colors.mediumRed} />
+            </View>
+          ) : totalItems === 0 && !search ? (
             <View style={[styles.emptyContainer, { marginTop: 24 }]}>
               <FontAwesome6
                 name="box-open"
@@ -149,11 +202,7 @@ export function ProductPickerModal({ visible, products, selectedId, onSelect, on
                 Nenhum produto com estoque disponível.
               </Text>
             </View>
-          ) : loading ? (
-            <View style={{ alignItems: "center", paddingVertical: 24 }}>
-              <ActivityIndicator size="small" color={colors.mediumRed} />
-            </View>
-          ) : filtered.length === 0 ? (
+          ) : items.length === 0 ? (
             <View style={[styles.emptyContainer, { marginTop: 16 }]}>
               <Text style={[styles.empty, { color: colors.text }]}>
                 Nenhum produto encontrado para "{search}".
@@ -161,17 +210,18 @@ export function ProductPickerModal({ visible, products, selectedId, onSelect, on
             </View>
           ) : (
             <FlatList
-              data={filtered}
+              data={items}
               keyExtractor={(p) => p.productId}
               renderItem={renderProduct}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={true}
-              contentContainerStyle={{ paddingBottom: 8, gap: 6 }}
+              contentContainerStyle={{ paddingBottom: 4, gap: 6 }}
+              ListFooterComponent={ListFooter}
             />
           )}
 
           {/* Botões */}
-          <View style={[styles.modalButtons, { marginTop: 12 }]}>
+          <View style={[styles.modalButtons, { marginTop: 12, paddingBottom: 16 }]}>
             <Button
               mode="outlined"
               onPress={onClose}

@@ -20,7 +20,7 @@ export const handleLogin = async (credentials) => {
     const list = await getUsers();
 
     const userFound = list.find(
-        u => u.email === credentials.login && u.password === credentials.password
+        u => u.email?.toLowerCase() === credentials.login.toLowerCase() && u.password === credentials.password
     );
 
     if (!userFound) {

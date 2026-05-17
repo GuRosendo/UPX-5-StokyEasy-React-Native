@@ -65,7 +65,7 @@ export function ClientModal({ visible, editingClient, form, setForm, onSave, onC
             returnKeyType="done"
           />
 
-          <View style={styles.modalButtons}>
+          <View style={[styles.modalButtons, { paddingBottom: 16 }]}>
             <Button
               mode="outlined"
               onPress={onClose}

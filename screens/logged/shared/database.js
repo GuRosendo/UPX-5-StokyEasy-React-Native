@@ -3,6 +3,8 @@ import * as SQLite from "expo-sqlite";
 // ─── Abrir banco ─────────────────────────────────────────────────────────────
 const db = SQLite.openDatabaseSync("app.db");
 
+const PAGE_SIZE = 30;
+
 // ─── Inicializar tabelas ──────────────────────────────────────────────────────
 export function initDatabase() {
   db.execSync(`
@@ -61,13 +63,93 @@ export function initDatabase() {
   try { db.execSync("ALTER TABLE products ADD COLUMN imageUri TEXT DEFAULT '';"); } catch (_) {}
 }
 
-// ─── PRODUTOS ─────────────────────────────────────────────────────────────────
+// ─── PRODUTOS — CRUD ─────────────────────────────────────────────────────────
 
+/** Retorna todos os produtos (sem paginação) — usado internamente e no picker. */
 export function getProducts(userId) {
   return db.getAllSync(
     "SELECT * FROM products WHERE userId = ? ORDER BY createdAt DESC",
     [userId]
   );
+}
+
+/**
+ * Retorna uma página de produtos com busca opcional no banco.
+ *
+ * @param {string} userId
+ * @param {number} page     — 1-based
+ * @param {string} search   — string de busca (nome, categoria, descrição)
+ * @returns {{ items: Array, total: number, totalPages: number }}
+ */
+export function getProductsPaged(userId, page = 1, search = "") {
+  const offset = (page - 1) * PAGE_SIZE;
+  const like   = `%${search.trim()}%`;
+  const hasSearch = search.trim().length > 0;
+
+  const whereExtra = hasSearch
+    ? "AND (LOWER(name) LIKE LOWER(?) OR LOWER(category) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))"
+    : "";
+  const params = hasSearch
+    ? [userId, like, like, like]
+    : [userId];
+  const countParams = hasSearch
+    ? [userId, like, like, like]
+    : [userId];
+
+  const total = db.getFirstSync(
+    `SELECT COUNT(*) as cnt FROM products WHERE userId = ? ${whereExtra}`,
+    countParams
+  )?.cnt ?? 0;
+
+  const items = db.getAllSync(
+    `SELECT * FROM products WHERE userId = ? ${whereExtra}
+     ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+    [...params, PAGE_SIZE, offset]
+  );
+
+  return {
+    items,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  };
+}
+
+/**
+ * Retorna uma página de produtos COM ESTOQUE > 0 — para o ProductPickerModal.
+ *
+ * @param {string} userId
+ * @param {number} page     — 1-based
+ * @param {string} search
+ * @returns {{ items: Array, total: number, totalPages: number }}
+ */
+export function getAvailableProductsPaged(userId, page = 1, search = "") {
+  const offset    = (page - 1) * PAGE_SIZE;
+  const like      = `%${search.trim()}%`;
+  const hasSearch = search.trim().length > 0;
+
+  const whereExtra = hasSearch
+    ? "AND (LOWER(name) LIKE LOWER(?) OR LOWER(category) LIKE LOWER(?))"
+    : "";
+  const params = hasSearch
+    ? [userId, like, like]
+    : [userId];
+
+  const total = db.getFirstSync(
+    `SELECT COUNT(*) as cnt FROM products WHERE userId = ? AND quantity > 0 ${whereExtra}`,
+    params
+  )?.cnt ?? 0;
+
+  const items = db.getAllSync(
+    `SELECT * FROM products WHERE userId = ? AND quantity > 0 ${whereExtra}
+     ORDER BY name ASC LIMIT ? OFFSET ?`,
+    [...params, PAGE_SIZE, offset]
+  );
+
+  return {
+    items,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  };
 }
 
 export function getProductById(productId) {
@@ -108,6 +190,10 @@ export function deleteProduct(productId) {
 
 // ─── CLIENTES ─────────────────────────────────────────────────────────────────
 
+/**
+ * Retorna todos os clientes com pedidos e parcelas (sem paginação).
+ * Usado internamente para derivar totais e operar sobre pedidos.
+ */
 export function getClients(userId) {
   const clients = db.getAllSync(
     "SELECT * FROM clients WHERE userId = ? ORDER BY createdAt DESC",
@@ -135,6 +221,79 @@ export function getClients(userId) {
     });
     return { ...client, orders: ordersWithInstallments };
   });
+}
+
+/**
+ * Retorna uma página de clientes com busca opcional no banco.
+ * Cada cliente já vem com seus pedidos e parcelas.
+ *
+ * @param {string} userId
+ * @param {number} page       — 1-based
+ * @param {string} search     — busca por nome, email ou telefone
+ * @param {boolean} showCompleted — se true, retorna apenas clientes com pedidos "completed"
+ * @returns {{ items: Array, total: number, totalPages: number }}
+ */
+export function getClientsPaged(userId, page = 1, search = "", showCompleted = false) {
+  const offset    = (page - 1) * PAGE_SIZE;
+  const like      = `%${search.trim()}%`;
+  const hasSearch = search.trim().length > 0;
+
+  const whereExtra = hasSearch
+    ? "AND (LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR phone LIKE ?)"
+    : "";
+  const params = hasSearch
+    ? [userId, like, like, like]
+    : [userId];
+
+  // Quando showCompleted, filtra apenas clientes que têm ao menos 1 pedido "completed"
+  const completedFilter = showCompleted
+    ? `AND clientId IN (
+         SELECT DISTINCT clientId FROM orders
+         WHERE userId = '${userId}' AND status = 'completed'
+       )`
+    : "";
+
+  const total = db.getFirstSync(
+    `SELECT COUNT(*) as cnt FROM clients
+     WHERE userId = ? ${whereExtra} ${completedFilter}`,
+    params
+  )?.cnt ?? 0;
+
+  const clientRows = db.getAllSync(
+    `SELECT * FROM clients
+     WHERE userId = ? ${whereExtra} ${completedFilter}
+     ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+    [...params, PAGE_SIZE, offset]
+  );
+
+  // Hidrata pedidos + parcelas para cada cliente da página
+  const items = clientRows.map((client) => {
+    const orders = db.getAllSync(
+      "SELECT * FROM orders WHERE clientId = ? ORDER BY createdAt DESC",
+      [client.clientId]
+    );
+    const ordersWithInstallments = orders.map((order) => {
+      const installments = db.getAllSync(
+        "SELECT * FROM installments WHERE orderId = ? ORDER BY idx ASC",
+        [order.orderId]
+      );
+      return {
+        ...order,
+        installments: installments.map((i) => ({
+          ...i,
+          paid: i.paid === 1,
+          index: i.idx,
+        })),
+      };
+    });
+    return { ...client, orders: ordersWithInstallments };
+  });
+
+  return {
+    items,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+  };
 }
 
 export function upsertClient(client) {

@@ -143,7 +143,7 @@ export function OrderModal({
           </View>
           <FontAwesome6 name="money-bill-wave" size={13} color={item.aVista ? "#27ae60" : colors.text} style={{ opacity: item.aVista ? 1 : 0.5 }} />
           <Text style={[styles.filterToggleText, { color: item.aVista ? "#27ae60" : colors.text }]}>
-            À vista — pagamento imediato
+            À vista
           </Text>
         </TouchableOpacity>
 
@@ -250,7 +250,7 @@ export function OrderModal({
         </View>
       )}
 
-      <View style={styles.modalButtons}>
+      <View style={[styles.modalButtons, { paddingBottom: 16 }]}>
         <Button
           mode="outlined"
           onPress={onClose}
@@ -306,7 +306,6 @@ export function OrderModal({
       {/* Modal de seleção de produto — fora do FlatList, sem scroll aninhado */}
       <ProductPickerModal
         visible={productModalIndex !== null}
-        products={availableProducts}
         selectedId={
           productModalIndex !== null
             ? orderItems[productModalIndex]?.productId

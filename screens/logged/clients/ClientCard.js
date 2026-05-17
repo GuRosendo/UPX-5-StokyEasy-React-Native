@@ -1,11 +1,12 @@
 import { View, TouchableOpacity, FlatList } from "react-native";
 import { Text, Card, Button } from "react-native-paper";
 import { FontAwesome6 } from "@expo/vector-icons";
+import { memo } from "react";
 import { toCurrencyDisplay } from "../shared/helpers";
 import { OrderCard } from "./OrderCard";
 import { styles } from "./clients.styles";
 
-export function ClientCard({
+export const ClientCard = memo(function ClientCard({
   client,
   isExpanded,
   expandedOrderId,
@@ -220,4 +221,13 @@ export function ClientCard({
         </Card>
     </View>
   );
-}
+}, (prev, next) => {
+  // Re-renderiza só se algo relevante mudou
+  return (
+    prev.client      === next.client &&
+    prev.isExpanded  === next.isExpanded &&
+    prev.expandedOrderId === next.expandedOrderId &&
+    prev.showCompleted   === next.showCompleted &&
+    prev.colors      === next.colors
+  );
+});

@@ -79,12 +79,12 @@ const RequestLogin = ({ navigation }) => {
                                 dataNascimento: formatDate(dateSelected, "EUA", true),
                             };
 
-                            setTimeout(async () => {
+                            async () => {
                                 if (await handleRequestLogin(values)) {
                                     navigation.navigate("Login");
                                 }
                                 setSubmitting(false);
-                            }, 2000);
+                            }
                         }}
                     >
                         {({ handleChange, handleBlur, handleSubmit, values, isSubmitting }) => (
