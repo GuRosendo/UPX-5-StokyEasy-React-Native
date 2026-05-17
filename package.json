@@ -58,7 +58,8 @@
     "react-native-web": "^0.21.0",
     "react-navigation-stack": "^2.10.4",
     "styled-components": "^6.1.14",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "undefined": "expo-image-picker\\"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

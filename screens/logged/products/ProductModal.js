@@ -49,9 +49,8 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status === "granted") {
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaType.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
+          mediaTypes: ["images"],
+          allowsEditing: false,
           quality: 0.7,
         });
         if (!result.canceled && result.assets?.length > 0) {
@@ -240,7 +239,7 @@ export function ProductModal({ visible, editingProduct, form, setForm, onSave, o
               />
 
               {/* Botões */}
-              <View style={[styles.modalButtons, { paddingBottom: 16 }]}>
+              <View style={styles.modalButtons}>
                 <Button
                   mode="outlined"
                   onPress={onClose}
