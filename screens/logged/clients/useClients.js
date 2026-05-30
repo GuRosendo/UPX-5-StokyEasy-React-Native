@@ -293,17 +293,29 @@ export function useClients() {
 
         const now = Date.now();
 
+        // Acumula qty total por produto para validação e update correto
+        const qtyMap = {};
+        for (const item of orderItems) {
+            const qty = parseInt(item.quantity, 10);
+            qtyMap[item.productId] = (qtyMap[item.productId] || 0) + qty;
+        }
+
+        // Valida estoque antes de inserir qualquer pedido
+        for (const item of orderItems) {
+            const prod = userProducts.find((p) => p.productId === item.productId);
+            if (!prod) continue;
+            if (qtyMap[item.productId] > prod.quantity) {
+                handleMessage(false, "Estoque insuficiente", `Disponível: ${prod.quantity} un. de "${prod.name}".`);
+                return;
+            }
+        }
+
+        // Insere os pedidos
         for (const item of orderItems) {
             const prod = userProducts.find((p) => p.productId === item.productId);
             if (!prod) continue;
             const qty  = parseInt(item.quantity, 10);
             const inst = item.aVista ? 1 : parseInt(item.installments, 10);
-
-            if (qty > prod.quantity) {
-                handleMessage(false, "Estoque insuficiente", `Disponível: ${prod.quantity} un. de "${prod.name}".`);
-                return;
-            }
-
             const total = prod.price * qty;
             const installmentValue = parseFloat((total / inst).toFixed(2));
 
@@ -313,26 +325,27 @@ export function useClients() {
                 value:         idx === inst - 1
                     ? parseFloat((total - installmentValue * (inst - 1)).toFixed(2))
                     : installmentValue,
-                dueDate: orderFirstDueDate
-                    ? addMonths(orderFirstDueDate, idx)
-                    : null,
+                dueDate: orderFirstDueDate ? addMonths(orderFirstDueDate, idx) : null,
             }));
 
-            const order = {
-                orderId:    `ord_${now}_${Math.random().toString(36).slice(2)}`,
-                clientId:   selectedClientId,
-                userId:     user.id,
-                totalValue: total,
-                quantity:   qty,
-                status:     item.aVista ? "completed" : "active",
-                productRef: prod.name,
-                productId:  prod.productId,
-                createdAt:  now,
+            insertOrder({
+                orderId:      `ord_${now}_${Math.random().toString(36).slice(2)}`,
+                clientId:     selectedClientId,
+                userId:       user.id,
+                totalValue:   total,
+                quantity:     qty,
+                status:       item.aVista ? "completed" : "active",
+                productRef:   prod.name,
+                productId:    prod.productId,
+                createdAt:    now,
                 installments: installmentsList,
-            };
+            });
+        }
 
-            insertOrder(order);
-            updateProductQuantity(prod.productId, prod.quantity - qty);
+        // Atualiza o estoque UMA VEZ por produto com o total acumulado
+        for (const [productId, totalQty] of Object.entries(qtyMap)) {
+            const prod = userProducts.find((p) => p.productId === productId);
+            if (prod) updateProductQuantity(productId, prod.quantity - totalQty);
         }
 
         closeOrderModal();
